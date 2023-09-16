@@ -1,9 +1,13 @@
-﻿namespace ProDuck.DTO;
+﻿using ProDuck.Models;
+
+namespace ProDuck.DTO;
 public class ProductDTO
 {
     public long? Id { get; set; }
     public string Name { get; set; } = null!;
-    public int Price { get; set; }
-    public int Cost { get; set; }
+    public decimal Price { get; set; }
+    public decimal Cost { get; set; }
     public string? Barcode { get; set; }
+    public long? CategoryId { get; set; }
+    public ProductCategoryDTO? Category { get; set; }
 }

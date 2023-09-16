@@ -9,6 +9,7 @@
 
         public long UserId { get; set; }
         public User SessionOpener { get; set; } = null!;
+
         public long POSId { get; set; }
         public PointOfSale POS { get; set; } = null!;
     }

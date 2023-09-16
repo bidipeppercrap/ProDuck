@@ -23,13 +23,23 @@ namespace ProDuck.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<ProductDTO>>> GetProducts([FromQuery] PaginationParams qp)
+        public async Task<ActionResult<IEnumerable<ProductDTO>>> GetProducts([FromQuery] long? categoryId,[FromQuery] PaginationParams qp)
         {
             if (_context.Products == null)
             {
                 return NotFound();
             }
-            return await _context.Products
+            var category = categoryId != null ? await _context.ProductCategories.FindAsync(categoryId) : null;
+
+            var q = _context.Products
+                .Where(x => x.Deleted == false); ;
+
+            if (categoryId != null) q = _context.Products
+                .Where(x => x.Deleted == false)
+                .Where(x => x.Category == category);
+
+            return await q
+                .Include(x => x.Category)
                 .Select(x => ProductToDTO(x))
                 .Skip((qp.Page - 1) * qp.PageSize)
                 .Take(qp.PageSize)
@@ -43,7 +53,10 @@ namespace ProDuck.Controllers
           {
               return NotFound();
           }
-            var product = await _context.Products.FindAsync(id);
+            var product = await _context.Products
+                .Where(product => product.Id == id)
+                .Include(product => product.Category)
+                .FirstOrDefaultAsync();
 
             if (product == null)
             {
@@ -54,30 +67,29 @@ namespace ProDuck.Controllers
         }
 
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutProduct(long id, ProductDTO product)
+        public async Task<IActionResult> PutProduct(long id, ProductDTO productDTO)
         {
-            if (id != product.Id)
-            {
-                return BadRequest();
-            }
+            var product = await _context.Products.FindAsync(id);
 
-            _context.Entry(product).State = EntityState.Modified;
+            if (product == null) return NotFound();
 
-            try
+            if (productDTO.CategoryId != null)
             {
-                await _context.SaveChangesAsync();
+                var category = await _context.ProductCategories.FindAsync(productDTO.CategoryId);
+                if (category == null) return BadRequest();
+
+                product.Category = category;
             }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!ProductExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
+            if (productDTO.CategoryId == null) product.Category = null;
+
+            product.Name = productDTO.Name;
+            product.Price = productDTO.Price;
+            product.Cost = productDTO.Cost;
+            product.Barcode = productDTO.Barcode;
+
+            _context.Products.Update(product);
+
+            await _context.SaveChangesAsync();
 
             return NoContent();
         }
@@ -90,12 +102,23 @@ namespace ProDuck.Controllers
                 return Problem("Entity set 'ProDuckContext.Products'  is null.");
             }
 
+            var category = new ProductCategory();
+            
+            if (productDTO.CategoryId != null)
+            {
+                category = await _context.ProductCategories.FindAsync(productDTO.CategoryId);
+                if (category == null) return BadRequest();
+            }
+
+            if (productDTO.CategoryId == null) category = null;
+
             var product = new Product
             {
                 Name = productDTO.Name,
                 Price = productDTO.Price,
                 Cost = productDTO.Cost,
                 Barcode = productDTO.Barcode,
+                Category = category
             };
 
             _context.Products.Add(product);
@@ -117,7 +140,7 @@ namespace ProDuck.Controllers
                 return NotFound();
             }
 
-            _context.Products.Remove(product);
+            product.Deleted = true;
             await _context.SaveChangesAsync();
 
             return NoContent();
@@ -135,7 +158,12 @@ namespace ProDuck.Controllers
                 Name = product.Name,
                 Price = product.Price,
                 Cost = product.Cost,
-                Barcode = product.Barcode
+                Barcode = product.Barcode,
+                Category = product.Category != null ? new ProductCategoryDTO
+                {
+                    Id = product.Category?.Id,
+                    Name = product.Category?.Name
+                } : null
             };
     }
 }

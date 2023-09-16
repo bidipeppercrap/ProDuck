@@ -121,7 +121,7 @@ namespace ProDuck.Controllers
                     Stock = s.Stock,
                     Location = new ProductStockLocationDTO()
                     {
-                        Id = s.Location.Id,
+                        Id = s.Location!.Id,
                         Name = s.Location.Name
                     }
                 });

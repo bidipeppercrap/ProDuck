@@ -7,10 +7,12 @@ namespace ProDuck.Models
     {
         public long? Id { get; set; }
         public string Name { get; set; } = null!;
-        public int Price { get; set; }
-        public int Cost { get; set; }
+        public decimal Price { get; set; }
+        public decimal Cost { get; set; }
         public string? Barcode { get; set; }
+        public bool Deleted { get; set; } = false;
 
+        public ProductCategory? Category { get; set; }
         public ICollection<StockLocation> Stocks { get; } = new List<StockLocation>();
     }
 }

@@ -5,7 +5,7 @@
         public long Id { get; set; }
         public long PurchaseId { get; set; }
         public long ProductId { get; set; }
-        public int Cost { get; set; }
+        public decimal Cost { get; set; }
         public int Quantity { get; set; }
 
         public Purchase Purchase { get; set; } = null!;

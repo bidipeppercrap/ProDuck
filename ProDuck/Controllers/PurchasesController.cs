@@ -207,7 +207,7 @@ namespace ProDuck.Controllers
             return true;
         }
 
-        public static dynamic PurchaseToListDTO (Purchase purchase, int totalCost)
+        public static dynamic PurchaseToListDTO (Purchase purchase, decimal totalCost)
         {
             dynamic dto;
 
