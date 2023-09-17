@@ -13,6 +13,9 @@ namespace ProDuck.Models
         public bool Deleted { get; set; } = false;
 
         public ProductCategory? Category { get; set; }
+
         public ICollection<StockLocation> Stocks { get; } = new List<StockLocation>();
+        public ICollection<CustomerPrice> CustomerPrices { get; } = new List<CustomerPrice>();
+        public ICollection<OrderItem> OrderItems { get; } = new List<OrderItem>();
     }
 }

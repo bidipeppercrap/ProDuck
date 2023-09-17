@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ProDuck.Models;
 
@@ -10,29 +11,16 @@ using ProDuck.Models;
 namespace ProDuck.Migrations
 {
     [DbContext(typeof(ProDuckContext))]
-    partial class ProDuckContextModelSnapshot : ModelSnapshot
+    [Migration("20230916144707_CustomerDelete")]
+    partial class CustomerDelete
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
                 .HasAnnotation("ProductVersion", "7.0.5")
                 .HasAnnotation("Relational:MaxIdentifierLength", 64);
-
-            modelBuilder.Entity("PointOfSaleUser", b =>
-                {
-                    b.Property<long>("AssignedPOSesId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("AssignedUsersId")
-                        .HasColumnType("bigint");
-
-                    b.HasKey("AssignedPOSesId", "AssignedUsersId");
-
-                    b.HasIndex("AssignedUsersId");
-
-                    b.ToTable("PointOfSaleUser");
-                });
 
             modelBuilder.Entity("ProDuck.Models.Customer", b =>
                 {
@@ -107,88 +95,23 @@ namespace ProDuck.Migrations
                     b.ToTable("Locations");
                 });
 
-            modelBuilder.Entity("ProDuck.Models.Order", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<long?>("CustomerId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("POSSessionId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("UserId")
-                        .HasColumnType("bigint");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CustomerId");
-
-                    b.HasIndex("POSSessionId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("Orders");
-                });
-
-            modelBuilder.Entity("ProDuck.Models.OrderItem", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    b.Property<decimal>("Cost")
-                        .HasColumnType("decimal(65,30)");
-
-                    b.Property<long>("OrderId")
-                        .HasColumnType("bigint");
-
-                    b.Property<decimal>("Price")
-                        .HasColumnType("decimal(65,30)");
-
-                    b.Property<long>("ProductId")
-                        .HasColumnType("bigint");
-
-                    b.Property<int>("Qty")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("OrderId");
-
-                    b.HasIndex("ProductId");
-
-                    b.ToTable("OrdersItem");
-                });
-
             modelBuilder.Entity("ProDuck.Models.POSSession", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bigint");
 
-                    b.Property<DateTime?>("ClosedAt")
+                    b.Property<DateTime>("ClosedAt")
                         .HasColumnType("datetime(6)");
 
-                    b.Property<decimal>("ClosingBalance")
-                        .HasColumnType("decimal(65,30)");
-
-                    b.Property<string>("ClosingRemark")
+                    b.Property<string>("Note")
                         .HasColumnType("longtext");
-
-                    b.Property<DateTime>("OpenedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<decimal>("OpeningBalance")
-                        .HasColumnType("decimal(65,30)");
 
                     b.Property<long>("POSId")
                         .HasColumnType("bigint");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("datetime(6)");
 
                     b.Property<long>("UserId")
                         .HasColumnType("bigint");
@@ -404,21 +327,6 @@ namespace ProDuck.Migrations
                     b.ToTable("Vendors");
                 });
 
-            modelBuilder.Entity("PointOfSaleUser", b =>
-                {
-                    b.HasOne("ProDuck.Models.PointOfSale", null)
-                        .WithMany()
-                        .HasForeignKey("AssignedPOSesId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("ProDuck.Models.User", null)
-                        .WithMany()
-                        .HasForeignKey("AssignedUsersId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("ProDuck.Models.CustomerPrice", b =>
                 {
                     b.HasOne("ProDuck.Models.Customer", "Customer")
@@ -445,50 +353,6 @@ namespace ProDuck.Migrations
                         .HasForeignKey("LocationId");
 
                     b.Navigation("ParentLocation");
-                });
-
-            modelBuilder.Entity("ProDuck.Models.Order", b =>
-                {
-                    b.HasOne("ProDuck.Models.Customer", "Customer")
-                        .WithMany("Orders")
-                        .HasForeignKey("CustomerId");
-
-                    b.HasOne("ProDuck.Models.POSSession", "POSSession")
-                        .WithMany("Orders")
-                        .HasForeignKey("POSSessionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("ProDuck.Models.User", "ServedBy")
-                        .WithMany("OrdersServed")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Customer");
-
-                    b.Navigation("POSSession");
-
-                    b.Navigation("ServedBy");
-                });
-
-            modelBuilder.Entity("ProDuck.Models.OrderItem", b =>
-                {
-                    b.HasOne("ProDuck.Models.Order", "Order")
-                        .WithMany("Items")
-                        .HasForeignKey("OrderId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("ProDuck.Models.Product", "Product")
-                        .WithMany("OrderItems")
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Order");
-
-                    b.Navigation("Product");
                 });
 
             modelBuilder.Entity("ProDuck.Models.POSSession", b =>
@@ -577,8 +441,6 @@ namespace ProDuck.Migrations
 
             modelBuilder.Entity("ProDuck.Models.Customer", b =>
                 {
-                    b.Navigation("Orders");
-
                     b.Navigation("ProductPrices");
                 });
 
@@ -589,16 +451,6 @@ namespace ProDuck.Migrations
                     b.Navigation("Products");
                 });
 
-            modelBuilder.Entity("ProDuck.Models.Order", b =>
-                {
-                    b.Navigation("Items");
-                });
-
-            modelBuilder.Entity("ProDuck.Models.POSSession", b =>
-                {
-                    b.Navigation("Orders");
-                });
-
             modelBuilder.Entity("ProDuck.Models.PointOfSale", b =>
                 {
                     b.Navigation("Sessions");
@@ -607,8 +459,6 @@ namespace ProDuck.Migrations
             modelBuilder.Entity("ProDuck.Models.Product", b =>
                 {
                     b.Navigation("CustomerPrices");
-
-                    b.Navigation("OrderItems");
 
                     b.Navigation("Stocks");
                 });
@@ -627,8 +477,6 @@ namespace ProDuck.Migrations
 
             modelBuilder.Entity("ProDuck.Models.User", b =>
                 {
-                    b.Navigation("OrdersServed");
-
                     b.Navigation("Sessions");
                 });
 

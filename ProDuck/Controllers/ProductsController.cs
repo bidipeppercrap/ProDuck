@@ -141,6 +141,7 @@ namespace ProDuck.Controllers
             }
 
             product.Deleted = true;
+            product.Barcode = null;
             await _context.SaveChangesAsync();
 
             return NoContent();

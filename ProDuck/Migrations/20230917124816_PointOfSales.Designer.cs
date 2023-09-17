@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ProDuck.Models;
 
@@ -10,9 +11,11 @@ using ProDuck.Models;
 namespace ProDuck.Migrations
 {
     [DbContext(typeof(ProDuckContext))]
-    partial class ProDuckContextModelSnapshot : ModelSnapshot
+    [Migration("20230917124816_PointOfSales")]
+    partial class PointOfSales
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -133,7 +136,7 @@ namespace ProDuck.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Orders");
+                    b.ToTable("Order");
                 });
 
             modelBuilder.Entity("ProDuck.Models.OrderItem", b =>
@@ -163,7 +166,7 @@ namespace ProDuck.Migrations
 
                     b.HasIndex("ProductId");
 
-                    b.ToTable("OrdersItem");
+                    b.ToTable("OrderItem");
                 });
 
             modelBuilder.Entity("ProDuck.Models.POSSession", b =>

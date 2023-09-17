@@ -6,8 +6,9 @@
         public int Stock { get; set; }
 
         public long ProductId { get; set; }
-        public long? LocationId { get; set; }
         public Product Product { get; set; } = null!;
+
+        public long? LocationId { get; set; }
         public Location? Location { get; set; }
     }
 }

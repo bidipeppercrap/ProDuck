@@ -8,5 +8,9 @@
         public string Password { get; set; } = null!;
 
         public ICollection<POSSession> Sessions { get; } = new List<POSSession>();
+        public ICollection<Order> OrdersServed { get; } = new List<Order>();
+
+        public List<PointOfSale> AssignedPOSes { get; } = new();
+
     }
 }

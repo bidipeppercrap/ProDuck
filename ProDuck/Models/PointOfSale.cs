@@ -7,5 +7,7 @@
         public string? Description { get; set; }
 
         public ICollection<POSSession> Sessions { get; } = new List<POSSession>();
+
+        public List<User> AssignedUsers { get; } = new();
     }
 }
