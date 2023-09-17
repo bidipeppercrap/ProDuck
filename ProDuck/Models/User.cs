@@ -1,5 +1,8 @@
-﻿namespace ProDuck.Models
+﻿using Microsoft.EntityFrameworkCore;
+
+namespace ProDuck.Models
 {
+    [Index(nameof(Username), IsUnique = true)]
     public class User
     {
         public long? Id { get; set; }
