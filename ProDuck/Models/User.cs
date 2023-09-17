@@ -9,6 +9,7 @@ namespace ProDuck.Models
         public string Username { get; set; } = null!;
         public string? Name { get; set; }
         public string Password { get; set; } = null!;
+        public bool IsDeleted { get; set; } = false;
 
         public ICollection<POSSession> Sessions { get; } = new List<POSSession>();
         public ICollection<Order> OrdersServed { get; } = new List<Order>();

@@ -4,8 +4,6 @@ using Microsoft.EntityFrameworkCore;
 using ProDuck.DTO;
 using ProDuck.Models;
 
-// For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
-
 namespace ProDuck.Controllers
 {
     [Route("[controller]")]
@@ -24,6 +22,7 @@ namespace ProDuck.Controllers
         {
             var user = await _context.Users
                 .Where(x => x.Username == loginDTO.Username)
+                .Where(x => x.IsDeleted == false)
                 .FirstOrDefaultAsync();
 
             if (user == null) return NotFound("No Username found with the given credentials.");

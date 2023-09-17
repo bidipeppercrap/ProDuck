@@ -1,9 +1,10 @@
 ﻿using Isopoh.Cryptography.Argon2;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using ProDuck.DTO;
 using ProDuck.Models;
-
-// For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
+using ProDuck.QueryParams;
+using ProDuck.Types;
 
 namespace ProDuck.Controllers
 {
@@ -18,26 +19,57 @@ namespace ProDuck.Controllers
             _context = context;
         }
 
-
-        // GET: api/<UsersController>
-        [HttpGet]
-        public IEnumerable<string> Get()
+        private static UserDTO UserToDTO(User user) =>
+            new()
+            {
+                Id = user.Id,
+                Name = user.Name,
+                Username = user.Username
+            };
+        private static ValidationResult ValidateDTO(UserCreateDTO dto)
         {
-            return new string[] { "value1", "value2" };
+            var result = new ValidationResult();
+
+            if (dto.Password.Length < 8) result.ErrorMessages.Add("Password length must be longer than 8 characters.");
+            if (dto.Username.Length < 3) result.ErrorMessages.Add("Username length must be longer than 3 characters.");
+
+            if (result.ErrorMessages.Count > 0) return result;
+
+            result.IsValid = true;
+
+            return result;
         }
 
-        // GET api/<UsersController>/5
-        [HttpGet("{id}")]
-        public string Get(int id)
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<UserDTO>>> Get([FromQuery] PaginationParams qp,[FromQuery] string keyword = "")
         {
-            return "value";
+            var users = await _context.Users
+                .Where(x => x.Username.ToLower().Contains(keyword) || (x.Name == null || x.Name.ToLower().Contains(keyword)))
+                .Where(x => x.IsDeleted == false)
+                .Select(x => UserToDTO(x))
+                .Skip((qp.Page - 1) * qp.PageSize)
+                .Take(qp.PageSize)
+                .ToListAsync();
+
+            return Ok(users);
+        }
+
+        [HttpGet("{id}")]
+        public async Task<ActionResult<UserDTO>> Get(long id)
+        {
+            var user = await _context.Users.FindAsync(id);
+
+            if (user == null) return NotFound();
+
+            return Ok(UserToDTO(user));
         }
 
         [HttpPost]
         public async Task<IActionResult> Post([FromBody] UserCreateDTO userDTO)
         {
-            if (userDTO.Password.Length < 8) return BadRequest("Password length must be longer than 8 characters.");
-            if (userDTO.Username.Length < 3) return BadRequest("Username length must be longer than 3 characters.");
+            var validation = ValidateDTO(userDTO);
+
+            if (validation.IsValid == false) return BadRequest(validation.ErrorMessages);
 
             var passwordHash = Argon2.Hash(userDTO.Password);
 
@@ -54,16 +86,40 @@ namespace ProDuck.Controllers
             return Ok();
         }
 
-        // PUT api/<UsersController>/5
         [HttpPut("{id}")]
-        public void Put(int id, [FromBody] string value)
+        public async Task<IActionResult> Put(long id, [FromBody] UserCreateDTO userDTO)
         {
+            var validation = ValidateDTO(userDTO);
+
+            if (!validation.IsValid) return BadRequest(validation.ErrorMessages);
+
+            var passwordHash = Argon2.Hash(userDTO.Password);
+            var user = await _context.Users.FindAsync(id);
+
+            if (user == null) return NotFound();
+
+            await _context.Users
+                .Where(x => x.Id == id)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(u => u.Name, userDTO.Name)
+                    .SetProperty(u => u.Username, userDTO.Username)
+                    .SetProperty(u => u.Password, passwordHash)
+                    );
+
+            return Ok();
         }
 
-        // DELETE api/<UsersController>/5
         [HttpDelete("{id}")]
-        public void Delete(int id)
+        public async Task<IActionResult> Delete(long id)
         {
+            var user = await _context.Users.FindAsync(id);
+
+            if (user == null) return NotFound();
+
+            user.IsDeleted = true;
+            await _context.SaveChangesAsync();
+
+            return Ok();
         }
     }
 }
