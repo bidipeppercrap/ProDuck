@@ -21,9 +21,10 @@ namespace ProDuck.Controllers
         public async Task<ActionResult<IEnumerable<CustomerDTO>>> Get([FromQuery] PaginationParams qp, [FromQuery] string keyword = "")
         {
             return await _context.Customers
+                .Include(x => x.ProductPrices)
+                    .ThenInclude(pp => pp.Product)
                 .Where(x => x.Name.ToLower().Contains(keyword.ToLower()))
                 .Where(x => x.IsDeleted == false)
-                .Include(x => x.ProductPrices)
                 .Select(x => CustomerToDTO(x))
                 .Skip((qp.Page - 1) * qp.PageSize)
                 .Take(qp.PageSize)
@@ -34,8 +35,9 @@ namespace ProDuck.Controllers
         public async Task<ActionResult<CustomerDTO>> Get(long id)
         {
             var customer = await _context.Customers
-                .Where(x => x.Id == id)
                 .Include(x => x.ProductPrices)
+                    .ThenInclude(pp => pp.Product)
+                .Where(x => x.Id == id)
                 .FirstOrDefaultAsync();
 
             if (customer == null) return NotFound();
