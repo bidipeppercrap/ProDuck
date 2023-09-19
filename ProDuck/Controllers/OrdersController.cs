@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using ProDuck.DTO;
 using ProDuck.Models;
+using ProDuck.Services;
 
 namespace ProDuck.Controllers
 {
@@ -100,6 +101,7 @@ namespace ProDuck.Controllers
                     };
 
                     order.Items.Add(item);
+                    await StockService.ModifyStock(item.ProductId, item.Qty * -1, _context);
                 }
 
                 _context.Orders.Add(order);
@@ -107,9 +109,9 @@ namespace ProDuck.Controllers
 
                 await transaction.CommitAsync();
             }
-            catch
+            catch (Exception e)
             {
-                return BadRequest();
+                return BadRequest(new List<string> { e.Message });
             }
 
             return NoContent();

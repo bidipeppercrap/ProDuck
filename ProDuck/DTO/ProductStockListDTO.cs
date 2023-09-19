@@ -9,7 +9,7 @@
     {
         public long Id { get; set; }
         public int Stock { get; set; }
-        public ProductStockLocationDTO Location { get; set; } = null!;
+        public ProductStockLocationDTO? Location { get; set; }
     }
     public class ProductStockListDTO
     {

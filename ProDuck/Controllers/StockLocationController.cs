@@ -23,7 +23,7 @@ namespace ProDuck.Controllers
         {
             var stocks = await _context.Locations
                 .Include(l => l.Products)
-                .ThenInclude(s => s.Product)
+                    .ThenInclude(s => s.Product)
                 .Where(l => l.Id == id)
                 .Select(x => LocationStockListToDTO(x))
                 .ToListAsync();
@@ -36,7 +36,7 @@ namespace ProDuck.Controllers
         {
             var stocks = await _context.Products
                 .Include(p => p.Stocks)
-                .ThenInclude(s => s.Location)
+                    .ThenInclude(s => s.Location)
                 .Where(p => p.Id == id)
                 .Select(x => ProductStockListToDTO(x))
                 .ToListAsync();
@@ -119,9 +119,9 @@ namespace ProDuck.Controllers
                 {
                     Id = s.Id,
                     Stock = s.Stock,
-                    Location = new ProductStockLocationDTO()
+                    Location = s.Location == null ? null : new ProductStockLocationDTO()
                     {
-                        Id = s.Location!.Id,
+                        Id = s.Location.Id,
                         Name = s.Location.Name
                     }
                 });

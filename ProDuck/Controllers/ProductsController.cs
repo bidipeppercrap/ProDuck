@@ -40,6 +40,7 @@ namespace ProDuck.Controllers
 
             return await q
                 .Include(x => x.Category)
+                .Include(_ => _.Stocks)
                 .Select(x => ProductToDTO(x))
                 .Skip((qp.Page - 1) * qp.PageSize)
                 .Take(qp.PageSize)
@@ -160,6 +161,7 @@ namespace ProDuck.Controllers
                 Price = product.Price,
                 Cost = product.Cost,
                 Barcode = product.Barcode,
+                Stock = product.Stocks.Sum(_ => _.Stock),
                 Category = product.Category != null ? new ProductCategoryDTO
                 {
                     Id = product.Category?.Id,

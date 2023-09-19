@@ -9,5 +9,6 @@ public class ProductDTO
     public decimal Cost { get; set; }
     public string? Barcode { get; set; }
     public long? CategoryId { get; set; }
+    public int Stock { get; set; }
     public ProductCategoryDTO? Category { get; set; }
 }
