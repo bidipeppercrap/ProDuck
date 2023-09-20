@@ -130,6 +130,8 @@ namespace ProDuck.Controllers
 
             if (dto.Name.Length < 3) result.ErrorMessages.Add("Vendor Name should at least 3 characters.");
 
+            if (result.ErrorMessages.Count > 0) return result;
+
             result.IsValid = true;
             return result;
         }

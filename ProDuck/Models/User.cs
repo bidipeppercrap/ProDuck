@@ -15,6 +15,6 @@ namespace ProDuck.Models
         public ICollection<Order> OrdersServed { get; } = new List<Order>();
 
         public List<PointOfSale> AssignedPOSes { get; } = new();
-
+        public List<Claim> Claims { get; } = new();
     }
 }

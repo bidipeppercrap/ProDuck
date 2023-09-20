@@ -24,5 +24,6 @@ namespace ProDuck.Models
         public DbSet<CustomerPrice> CustomerPrice { get; set; } = null!;
         public DbSet<Order> Orders { get; set; } = null!;
         public DbSet<OrderItem> OrdersItem { get; set; } = null!;
+        public DbSet<Claim> Claims { get; set; } = null!;
     }
 }
