@@ -77,9 +77,9 @@ namespace ProDuck.Controllers
         public async Task<ActionResult<IEnumerable<OrderDTO>>> Get([FromQuery] PaginationParams qp, [FromQuery] long? userId, [FromQuery] long? customerId)
         {
             IQueryable<Order> whereQuery = _context.Orders
-                .Include(_ => _.ServedBy)
-                .Include(_ => _.Customer)
-                .Include(_ => _.Items);
+                .Include(x => x.ServedBy)
+                .Include(x => x.Customer)
+                .Include(x => x.Items);
 
             if (userId != null) whereQuery = whereQuery.Where(_ => _.UserId == userId);
             if (customerId != null) whereQuery = whereQuery.Where(_ => _.CustomerId == customerId);
@@ -97,9 +97,9 @@ namespace ProDuck.Controllers
         public async Task<ActionResult<IEnumerable<OrderDTO>>> GetBySession(long id, [FromQuery] PaginationParams qp, [FromQuery] long? userId, [FromQuery] long? customerId)
         {
             IQueryable<Order> whereQuery = _context.Orders
-                .Include(_ => _.ServedBy)
-                .Include(_ => _.Customer)
-                .Include(_ => _.Items);
+                .Include(x => x.ServedBy)
+                .Include(x => x.Customer)
+                .Include(x => x.Items);
 
             if (userId != null) whereQuery = whereQuery.Where(_ => _.UserId == userId);
             if (customerId != null) whereQuery = whereQuery.Where(_ => _.CustomerId == customerId);
@@ -118,10 +118,10 @@ namespace ProDuck.Controllers
         public async Task<ActionResult<IEnumerable<OrderDTO>>> GetByPOS(long id, [FromQuery] PaginationParams qp, [FromQuery] long? userId, [FromQuery] long? customerId)
         {
             IQueryable<Order> whereQuery = _context.Orders
-                .Include(_ => _.ServedBy)
-                .Include(_ => _.Customer)
-                .Include(_ => _.POSSession)
-                .Include(_ => _.Items);
+                .Include(x => x.ServedBy)
+                .Include(x => x.Customer)
+                .Include(x => x.POSSession)
+                .Include(x => x.Items);
 
             if (userId != null) whereQuery = whereQuery.Where(_ => _.UserId == userId);
             if (customerId != null) whereQuery = whereQuery.Where(_ => _.CustomerId == customerId);
@@ -140,10 +140,10 @@ namespace ProDuck.Controllers
         public async Task<ActionResult<IEnumerable<OrderDTO>>> PostToReturn([FromBody] List<OrderDTOItem> itemsDTO)
         {
             var whereQuery = _context.Orders
-                .Include(_ => _.ServedBy)
-                .Include(_ => _.Customer)
-                .Include(_ => _.POSSession)
-                .Include(_ => _.Items)
+                .Include(x => x.ServedBy)
+                .Include(x => x.Customer)
+                .Include(x => x.POSSession)
+                .Include(x => x.Items)
                 .AsQueryable();
 
             foreach(var dto in itemsDTO)
@@ -152,10 +152,13 @@ namespace ProDuck.Controllers
             }
 
             var orders = await whereQuery
-                .Select(_ => OrderToDTO(_))
+                .Select(x => OrderToDTO(x))
+                .Take(80)
                 .ToListAsync();
 
-            return Ok(orders);
+            var result = orders.OrderByDescending(x => x.CreatedAt);
+
+            return Ok(result);
         }
 
         [HttpPost]
