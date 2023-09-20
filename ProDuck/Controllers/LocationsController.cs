@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using AutoWrapper.Wrappers;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NuGet.Protocol;
@@ -6,6 +7,8 @@ using ProDuck.DTO;
 using ProDuck.Migrations;
 using ProDuck.Models;
 using ProDuck.QueryParams;
+using ProDuck.Responses;
+using ProDuck.Types;
 
 namespace ProDuck.Controllers
 {
@@ -20,14 +23,28 @@ namespace ProDuck.Controllers
             _context = context;
         }
 
+        private static ValidationResult ValidateLocationDTO(LocationDTO dto)
+        {
+            var result = new ValidationResult();
+
+            if (dto.Name.Length < 3) result.ErrorMessages.Add("Name must be longer than 2 characters.");
+            if (dto.LocationId == dto.Id) result.ErrorMessages.Add("Parent Location cannot be thy self.");
+
+            if (result.ErrorMessages.Count > 0) return result;
+
+            result.IsValid = true;
+
+            return result;
+        }
+
         [HttpGet("{id}")]
-        public async Task<ActionResult<LocationDTO>> GetLocation(long id)
+        public async Task<PaginatedResponse> GetLocation(long id)
         {
             var location = await _context.Locations.FindAsync(id);
 
             if (location == null)
             {
-                return NotFound();
+                throw new ApiException("Location not found.");
             }
 
             if (location.LocationId != null)
@@ -36,19 +53,23 @@ namespace ProDuck.Controllers
                 var locationDTO = LocationToDTO(location);
                 locationDTO.ParentLocation = LocationToDTO(parentLocation!);
 
-                return locationDTO;
+                return new PaginatedResponse(locationDTO);
             }
 
-            return LocationToDTO(location);
+            return new PaginatedResponse(LocationToDTO(location));
         }
 
         [HttpPut("{id}")]
-        public async Task<ActionResult> UpdateLocation(long id, [FromBody] LocationDTO dto)
+        public async Task<IActionResult> UpdateLocation(long id, [FromBody] LocationDTO dto)
         {
+            dto.Id = id;
+            var validation = ValidateLocationDTO(dto);
+            if (!validation.IsValid) throw new ApiException(validation.ErrorMessages.First());
+
             var location = await _context.Locations.FindAsync(id);
 
-            if (location == null) return NotFound();
-            if (!await ValidateLocation(dto)) return BadRequest();
+            if (location == null) throw new ApiException("Location not found.");
+            if (!await ValidateLocation(dto)) throw new ApiException("Parent location not found");
 
             await _context.Locations
                 .Where(l => l.Id == id)
@@ -68,7 +89,7 @@ namespace ProDuck.Controllers
             {
                 var location = await _context.Locations.FindAsync(id);
 
-                if (location == null) return NotFound();
+                if (location == null) throw new ApiException("Location not found.");
 
                 _context.Locations
                     .Where(l => l.ParentLocation == location)
@@ -116,46 +137,62 @@ namespace ProDuck.Controllers
 
                 await transaction.CommitAsync();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                throw;
+                if (ex.InnerException != null) throw new ApiException(ex.InnerException.Message);
+                throw new ApiException(ex.Message);
             }
 
             return NoContent();
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<LocationDTO>>> FetchLocations([FromQuery] long? exclude, [FromQuery] PaginationParams qp)
+        public async Task<PaginatedResponse> FetchLocations([FromQuery] long? exclude, [FromQuery] PaginationParams qp)
         {
-            var whereQuery = _context.Locations;
+            var whereQuery = _context.Locations.AsQueryable();
                 
             if (exclude != null)
             {
-                return await _context.Locations
+                var resultExclude = await _context.Locations
                     .Where(x => x.Id != exclude)
                     .Select(x => LocationToDTO(x))
-                    .Skip((qp.Page - 1) * qp.PageSize)
-                    .Take(qp.PageSize)
-                    .ToListAsync();
+                    .ToPagedListAsync(qp.Page, qp.PageSize);
+
+                return new PaginatedResponse(resultExclude, new Pagination
+                {
+                    Count = resultExclude.Count,
+                    Page = qp.Page,
+                    PageSize = qp.PageSize,
+                    TotalPages = resultExclude.TotalPages
+                });
             }
 
-            return await whereQuery
+            var result = await whereQuery
                 .Select(x => LocationToDTO(x))
-                .Skip((qp.Page - 1) * qp.PageSize)
-                .Take(qp.PageSize)
-                .ToListAsync();
+                .ToPagedListAsync(qp.Page, qp.PageSize);
+
+            return new PaginatedResponse(result, new Pagination
+            {
+                Count = result.Count,
+                Page = qp.Page,
+                PageSize = qp.PageSize,
+                TotalPages = result.TotalPages
+            });
         }
 
         [HttpPost]
         public async Task<ActionResult<LocationDTO>> PostLocation(LocationDTO locationDTO)
         {
+            var validation = ValidateLocationDTO(locationDTO);
+            if (!validation.IsValid) throw new ApiException(validation.ErrorMessages.First());
+
             var location = new Location
             {
                 Name = locationDTO.Name,
                 LocationId = locationDTO.LocationId,
             };
 
-            if (!await ValidateLocation(locationDTO)) return BadRequest();
+            if (!await ValidateLocation(locationDTO)) throw new ApiException("Parent Location not found.");
 
             _context.Locations.Add(location);
             await _context.SaveChangesAsync();
@@ -165,9 +202,6 @@ namespace ProDuck.Controllers
 
         private async Task<bool> ValidateLocation(LocationDTO locationDTO)
         {
-            if (locationDTO.LocationId == null) return true;
-            if (locationDTO.LocationId == locationDTO.Id) return false;
-
             if (locationDTO.LocationId.HasValue)
             {
                 var parentLocation = await _context.Locations.FindAsync(locationDTO.LocationId);

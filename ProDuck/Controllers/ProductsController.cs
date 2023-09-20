@@ -78,12 +78,14 @@ namespace ProDuck.Controllers
                 throw new ApiException("Product not found.", 404);
             }
 
-            return new PaginatedResponse(product);
+            return new PaginatedResponse(ProductToDTO(product));
         }
 
         [HttpPut("{id}")]
         public async Task<IActionResult> PutProduct(long id, ProductDTO productDTO)
         {
+            if (productDTO.Name.Length < 3) throw new ApiException("Name must be longer than 2.");
+
             var product = await _context.Products.FindAsync(id);
 
             if (product == null) throw new ApiException("Product not found.", 404);
@@ -119,6 +121,8 @@ namespace ProDuck.Controllers
         [HttpPost]
         public async Task<ActionResult<ProductDTO>> PostProduct(ProductDTO productDTO)
         {
+            if (productDTO.Name.Length < 3) throw new ApiException("Name must be longer than 2.");
+
             if (_context.Products == null)
             {
                 return Problem("Entity set 'ProDuckContext.Products'  is null.");

@@ -1,7 +1,11 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using AutoWrapper.Wrappers;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ProDuck.DTO;
 using ProDuck.Models;
+using ProDuck.QueryParams;
+using ProDuck.Responses;
+using ProDuck.Types;
 using System.Text.Json.Serialization;
 using static ProDuck.Controllers.ProductsController;
 
@@ -19,35 +23,48 @@ namespace ProDuck.Controllers
         }
 
         [HttpGet("location/{id}")]
-        public async Task<ActionResult<IEnumerable<string>>> GetProductsInLocation(long id)
+        public async Task<PaginatedResponse> GetProductsInLocation(long id, [FromQuery] PaginationParams qp)
         {
-            var stocks = await _context.Locations
+            var result = await _context.Locations
                 .Include(l => l.Products)
                     .ThenInclude(s => s.Product)
                 .Where(l => l.Id == id)
                 .Select(x => LocationStockListToDTO(x))
-                .ToListAsync();
+                .ToPagedListAsync(qp.Page, qp.PageSize);
 
-            return Ok(stocks);
+            return new PaginatedResponse(result, new Pagination
+            {
+                Count = result.Count,
+                Page = qp.Page,
+                PageSize = qp.PageSize,
+                TotalPages = result.TotalPages
+            });
         }
 
         [HttpGet("product/{id}")]
-        public async Task<ActionResult<IEnumerable<string>>> GetLocationsOfProduct(long id)
+        public async Task<PaginatedResponse> GetLocationsOfProduct(long id, [FromQuery] PaginationParams qp)
         {
-            var stocks = await _context.Products
+            var result = await _context.Products
                 .Include(p => p.Stocks)
                     .ThenInclude(s => s.Location)
                 .Where(p => p.Id == id)
                 .Select(x => ProductStockListToDTO(x))
-                .ToListAsync();
+                .ToPagedListAsync(qp.Page, qp.PageSize);
 
-            return Ok(stocks);
+            return new PaginatedResponse(result, new Pagination
+            {
+                Count = result.Count,
+                Page = qp.Page,
+                PageSize = qp.PageSize,
+                TotalPages = result.TotalPages
+            });
         }
 
         [HttpPost]
-        public async Task<ActionResult> Post([FromBody] StockCreateDTO stockDTO)
+        public async Task<IActionResult> Post([FromBody] StockCreateDTO stockDTO)
         {
-            if (!await ValidateStockCreate(stockDTO)) return BadRequest();
+            var validation = await ValidateStockCreateAsync(stockDTO);
+            if (!validation.IsValid) throw new ApiException(validation.ErrorMessages.First());
 
             var stock = new StockLocation()
             {
@@ -59,24 +76,20 @@ namespace ProDuck.Controllers
             _context.StockLocation.Add(stock);
             await _context.SaveChangesAsync();
 
-            return Ok();
+            return NoContent();
         }
 
         [HttpPut("{id}")]
         public async Task<ActionResult> Put(long id, [FromBody] StockUpdateDTO updateDTO)
         {
             var stock = await _context.StockLocation.FindAsync(id);
-
-            if (stock == null)
-            {
-                return NotFound();
-            }
+            if (stock == null) throw new ApiException("Stock not found.");
 
             await _context.StockLocation
                 .Where(s => s.Id == id)
                 .ExecuteUpdateAsync(s => s.SetProperty(x => x.Stock, updateDTO.Stock));
 
-            return Ok();
+            return NoContent();
         }
 
         [HttpDelete("{id}")]
@@ -84,29 +97,29 @@ namespace ProDuck.Controllers
         {
             var stock = await _context.StockLocation.FindAsync(id);
 
-            if (stock == null)
-            {
-                return NotFound();
-            }
+            if (stock == null) throw new ApiException("Stock not found.");
 
             await _context.StockLocation
                 .Where(s => s.Id == id)
                 .ExecuteDeleteAsync();
 
-            return Ok();
+            return NoContent();
         }
 
-        private async Task<bool> ValidateStockCreate(StockCreateDTO stockCreateDTO)
+        private async Task<ValidationResult> ValidateStockCreateAsync(StockCreateDTO stockCreateDTO)
         {
-            var product = await _context.Products.FindAsync(stockCreateDTO.ProductId);
+            var result = new ValidationResult();
 
-            if (product == null) return false;
+            var product = await _context.Products.FindAsync(stockCreateDTO.ProductId);
+            if (product == null) result.ErrorMessages.Add("Product not found.");
 
             var location = await _context.Locations.FindAsync(stockCreateDTO.LocationId);
+            if (location == null) result.ErrorMessages.Add("Product not found.");
 
-            if (location == null) return false;
+            if (result.ErrorMessages.Count > 0) return result;
 
-            return true;
+            result.IsValid = true;
+            return result;
         }
 
         private static ProductStockListDTO ProductStockListToDTO(Product product)

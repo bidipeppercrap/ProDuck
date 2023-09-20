@@ -1,9 +1,11 @@
-﻿using Isopoh.Cryptography.Argon2;
+﻿using AutoWrapper.Wrappers;
+using Isopoh.Cryptography.Argon2;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ProDuck.DTO;
 using ProDuck.Models;
 using ProDuck.QueryParams;
+using ProDuck.Responses;
 using ProDuck.Types;
 
 namespace ProDuck.Controllers
@@ -41,35 +43,36 @@ namespace ProDuck.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<UserDTO>>> Get([FromQuery] PaginationParams qp,[FromQuery] string keyword = "")
+        public async Task<PaginatedResponse> Get([FromQuery] PaginationParams qp, [FromQuery] string keyword = "")
         {
-            var users = await _context.Users
+            var result = await _context.Users
                 .Where(x => x.Username.ToLower().Contains(keyword) || (x.Name == null || x.Name.ToLower().Contains(keyword)))
                 .Where(x => x.IsDeleted == false)
                 .Select(x => UserToDTO(x))
-                .Skip((qp.Page - 1) * qp.PageSize)
-                .Take(qp.PageSize)
-                .ToListAsync();
+                .ToPagedListAsync(qp.Page, qp.PageSize);
 
-            return Ok(users);
+            return new PaginatedResponse(result, new Pagination
+            {
+                Count = result.Count,
+                Page = qp.Page,
+                PageSize = qp.PageSize,
+                TotalPages = result.TotalPages,
+            });
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<UserDTO>> Get(long id)
+        public async Task<PaginatedResponse> Get(long id)
         {
-            var user = await _context.Users.FindAsync(id);
+            var user = await _context.Users.FindAsync(id) ?? throw new ApiException("User not found.");
 
-            if (user == null) return NotFound();
-
-            return Ok(UserToDTO(user));
+            return new PaginatedResponse(UserToDTO(user));
         }
 
         [HttpPost]
         public async Task<IActionResult> Post([FromBody] UserCreateDTO userDTO)
         {
             var validation = ValidateDTO(userDTO);
-
-            if (validation.IsValid == false) return BadRequest(validation.ErrorMessages);
+            if (!validation.IsValid) throw new ApiException(validation.ErrorMessages.First());
 
             var passwordHash = Argon2.Hash(userDTO.Password);
 
@@ -83,20 +86,18 @@ namespace ProDuck.Controllers
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
-            return Ok();
+            return NoContent();
         }
 
         [HttpPut("{id}")]
         public async Task<IActionResult> Put(long id, [FromBody] UserCreateDTO userDTO)
         {
             var validation = ValidateDTO(userDTO);
+            if (!validation.IsValid) throw new ApiException(validation.ErrorMessages.First());
 
-            if (!validation.IsValid) return BadRequest(validation.ErrorMessages);
+            var user = await _context.Users.FindAsync(id) ?? throw new ApiException("User not found.");
 
             var passwordHash = Argon2.Hash(userDTO.Password);
-            var user = await _context.Users.FindAsync(id);
-
-            if (user == null) return NotFound();
 
             await _context.Users
                 .Where(x => x.Id == id)
@@ -104,22 +105,20 @@ namespace ProDuck.Controllers
                     .SetProperty(u => u.Name, userDTO.Name)
                     .SetProperty(u => u.Username, userDTO.Username)
                     .SetProperty(u => u.Password, passwordHash)
-                    );
+                );
 
-            return Ok();
+            return NoContent();
         }
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(long id)
         {
-            var user = await _context.Users.FindAsync(id);
-
-            if (user == null) return NotFound();
+            var user = await _context.Users.FindAsync(id) ?? throw new ApiException("User not found.");
 
             user.IsDeleted = true;
             await _context.SaveChangesAsync();
 
-            return Ok();
+            return NoContent();
         }
     }
 }

@@ -1,8 +1,11 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using AutoWrapper.Wrappers;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ProDuck.DTO;
 using ProDuck.Models;
 using ProDuck.QueryParams;
+using ProDuck.Responses;
+using ProDuck.Types;
 using System.Collections.ObjectModel;
 using System.Dynamic;
 
@@ -20,19 +23,25 @@ namespace ProDuck.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<dynamic>>> Get([FromQuery] PaginationParams qp)
+        public async Task<PaginatedResponse> Get([FromQuery] PaginationParams qp)
         {
-            return await _context.Purchases
+            var result = await _context.Purchases
                 .Include(p => p.Vendor)
                 .Include(p => p.Orders)
                 .Select(p => PurchaseToListDTO(p, p.Orders.Sum(o => o.Cost)))
-                .Skip((qp.Page - 1) * qp.PageSize)
-                .Take(qp.PageSize)
-                .ToListAsync();
+                .ToPagedListAsync(qp.Page, qp.PageSize);
+
+            return new PaginatedResponse(result, new Pagination
+            {
+                Count = result.Count,
+                Page = qp.Page,
+                PageSize = qp.PageSize,
+                TotalPages = result.TotalPages
+            });
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<dynamic>> Get(long id)
+        public async Task<PaginatedResponse> Get(long id)
         {
             var purchase = await _context.Purchases
                 .Include(p => p.Orders)
@@ -42,7 +51,7 @@ namespace ProDuck.Controllers
                 .Select(p => PurchaseToDTO(p))
                 .FirstOrDefaultAsync();
 
-            if (purchase == null) return BadRequest();
+            if (purchase == null) throw new ApiException("Purchase not found.");
 
             dynamic dto;
 
@@ -55,15 +64,16 @@ namespace ProDuck.Controllers
             dto.Orders = purchase.Orders;
             dto.IsDelivered = purchase.IsDelivered;
 
-            return dto;
+            return new PaginatedResponse(dto);
         }
 
         [HttpPost]
-        public async Task<ActionResult> Post([FromBody] PurchaseDTO payload)
+        public async Task<IActionResult> Post([FromBody] PurchaseDTO payload)
         {
             using var transaction = _context.Database.BeginTransaction();
 
-            if (!await ValidatePurchase(payload)) return BadRequest();
+            var validation = await ValidatePurchaseAsync(payload);
+            if (!validation.IsValid) throw new ApiException(validation.ErrorMessages.First());
 
             var purchase = new Purchase
             {
@@ -102,9 +112,10 @@ namespace ProDuck.Controllers
 
                 await transaction.CommitAsync();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                throw;
+                if (ex.InnerException != null) throw new ApiException(ex.InnerException.Message);
+                throw new ApiException(ex.Message);
             }
 
             return NoContent();
@@ -113,10 +124,13 @@ namespace ProDuck.Controllers
         [HttpPut("{id}")]
         public async Task<ActionResult> Put(long id, [FromBody] PurchaseDTO dto)
         {
-            var transaction = _context.Database.BeginTransaction();
-            var purchase = await _context.Purchases.FindAsync(id);
+            var validation = await ValidatePurchaseAsync(dto);
+            if (!validation.IsValid) throw new ApiException(validation.ErrorMessages.First());
 
-            if (purchase == null) return NotFound();
+            var transaction = _context.Database.BeginTransaction();
+
+            var purchase = await _context.Purchases.FindAsync(id);
+            if (purchase == null) throw new ApiException("Purchase not found.");
 
             purchase.Date = dto.Date;
             purchase.VendorId = dto.VendorId;
@@ -198,13 +212,18 @@ namespace ProDuck.Controllers
             return NoContent();
         }
 
-        private async Task<bool> ValidatePurchase(PurchaseDTO purchase)
+        private async Task<ValidationResult> ValidatePurchaseAsync(PurchaseDTO dto)
         {
-            var vendor = await _context.Vendors.FindAsync(purchase.VendorId);
+            var result = new ValidationResult();
+            var vendor = await _context.Vendors.FindAsync(dto.VendorId);
 
-            if (vendor == null) return false;
+            if (vendor == null) result.ErrorMessages.Add("Vendor not found.");
 
-            return true;
+            if (result.ErrorMessages.Count > 0) return result;
+
+            result.IsValid = true;
+
+            return result;
         }
 
         public static dynamic PurchaseToListDTO (Purchase purchase, decimal totalCost)

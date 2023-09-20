@@ -1,8 +1,11 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using AutoWrapper.Wrappers;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ProDuck.DTO;
 using ProDuck.Models;
 using ProDuck.QueryParams;
+using ProDuck.Responses;
+using ProDuck.Types;
 
 namespace ProDuck.Controllers
 {
@@ -17,9 +20,23 @@ namespace ProDuck.Controllers
             _context = context;
         }
 
+        private static ValidationResult ValidatePOS(PointOfSale pos)
+        {
+            var result = new ValidationResult();
+
+            if (pos.Name.Length < 3) result.ErrorMessages.Add("PoS Name should be longer than 2 characters.");
+
+            if (result.ErrorMessages.Count > 0) return result;
+
+            result.IsValid = true;
+
+            return result;
+        }
+
         private static POSDTO POSToDTO(PointOfSale pos)
         {
             var assignedUsers = new List<POSDTOAssignedUser>();
+
             foreach (var u in pos.AssignedUsers)
                 assignedUsers.Add(new POSDTOAssignedUser
                 {
@@ -48,56 +65,64 @@ namespace ProDuck.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<POSDTO>>> Get([FromQuery] PaginationParams qp, [FromQuery] string keyword = "")
+        public async Task<PaginatedResponse> Get([FromQuery] PaginationParams qp, [FromQuery] string keyword = "")
         {
-            var poses = await _context.PointOfSale
+            var result = await _context.PointOfSale
                 .Include(x => x.Sessions.Where(s => s.ClosedAt == null))
                 .Where(x => x.IsDeleted == false)
                 .Where(x => x.Name.ToLower().Contains(keyword.ToLower()))
                 .Select(x => POSToDTO(x))
-                .Skip((qp.Page - 1) * qp.PageSize)
-                .Take(qp.PageSize)
-                .ToListAsync();
+                .ToPagedListAsync(qp.Page, qp.PageSize);
 
-            return Ok(poses);
+            return new PaginatedResponse(result, new Pagination
+            {
+                Count = result.Count,
+                Page = qp.Page,
+                PageSize = qp.PageSize,
+                TotalPages = result.TotalPages,
+            });
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<POSDTO>> Get(long id)
+        public async Task<PaginatedResponse> Get(long id)
         {
             var pos = await _context.PointOfSale
                 .Include(x => x.Sessions.Where(s => s.ClosedAt == null))
                 .Include(x => x.AssignedUsers.Where(u => u.IsDeleted == false))
+                .Where(x => x.Id == id)
                 .Select(x => POSToDTO(x))
                 .FirstOrDefaultAsync();
 
-            if (pos == null) return NotFound();
-
-            return Ok(pos);
+            return pos == null ? throw new ApiException("PoS not found.") : new PaginatedResponse(pos);
         }
 
         [HttpPost]
         public async Task<IActionResult> Post([FromBody] PointOfSale pos)
         {
+            var validation = ValidatePOS(pos);
+            if (!validation.IsValid) throw new ApiException(validation.ErrorMessages.First());
+
             _context.PointOfSale.Add(pos);
             await _context.SaveChangesAsync();
 
-            return Ok();
+            return NoContent();
         }
 
         [HttpPut("{id}")]
-        public async Task<IActionResult> Put(long id, [FromBody] POSDTO posDTO)
+        public async Task<IActionResult> Put(long id, [FromBody] PointOfSale posDTO)
         {
-            var pos = await _context.PointOfSale.FindAsync(id);
+            var validation = ValidatePOS(posDTO);
+            if (!validation.IsValid) throw new ApiException(validation.ErrorMessages.First());
 
-            if (pos == null) return NotFound();
+            var pos = await _context.PointOfSale.FindAsync(id);
+            if (pos == null) throw new ApiException("PoS not found.");
 
             pos.Name = posDTO.Name;
             pos.Description = posDTO.Description;
 
             await _context.SaveChangesAsync();
 
-            return Ok();
+            return NoContent();
         }
 
         [HttpDelete("{id}")]
@@ -105,13 +130,13 @@ namespace ProDuck.Controllers
         {
             var pos = await _context.PointOfSale.FindAsync(id);
 
-            if (pos == null) return NotFound();
+            if (pos == null) throw new ApiException("PoS not found.");
 
             pos.IsDeleted = true;
 
             await _context.SaveChangesAsync();
 
-            return Ok();
+            return NoContent();
         }
     }
 }

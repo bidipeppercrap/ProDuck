@@ -1,8 +1,11 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using AutoWrapper.Wrappers;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ProDuck.DTO;
 using ProDuck.Models;
 using ProDuck.QueryParams;
+using ProDuck.Responses;
+using ProDuck.Types;
 
 namespace ProDuck.Controllers
 {
@@ -50,41 +53,44 @@ namespace ProDuck.Controllers
         }
 
         [HttpGet("products/{id}")]
-        public async Task<ActionResult<IEnumerable<CustomerPriceDTO>>> GetProductPrices([FromQuery] PaginationParams qp, long id)
+        public async Task<PaginatedResponse> GetProductPrices([FromQuery] PaginationParams qp, long id)
         {
             var prices = await _context.CustomerPrice
                 .Where(x => x.ProductId == id)
                 .Include(x => x.Customer)
                 .Select(x => PriceToDTO(x))
-                .Skip((qp.Page - 1) * qp.PageSize)
-                .Take(qp.PageSize)
-                .ToListAsync();
+                .ToPagedListAsync(qp.Page, qp.PageSize);
 
-            return Ok(prices);
+            return new PaginatedResponse(prices, new Pagination { Count = prices.Count, Page = qp.Page, PageSize = qp.PageSize, TotalPages = prices.TotalPages });
         }
 
         [HttpGet("customers/{id}")]
-        public async Task<ActionResult<IEnumerable<CustomerPriceDTO>>> GetCustomerPrices([FromQuery] PaginationParams qp, long id)
+        public async Task<PaginatedResponse> GetCustomerPrices([FromQuery] PaginationParams qp, long id)
         {
             var prices = await _context.CustomerPrice
                 .Where(x => x.CustomerId == id)
                 .Include(x => x.Product)
                 .Select(x => PriceToDTO(x))
-                .Skip((qp.Page - 1) * qp.PageSize)
-                .Take(qp.PageSize)
-                .ToListAsync();
+                .ToPagedListAsync(qp.Page, qp.PageSize);
 
-            return Ok(prices);
+
+            return new PaginatedResponse(prices, new Pagination
+            {
+                Count = prices.Count,
+                Page = qp.Page,
+                PageSize = qp.PageSize,
+                TotalPages = prices.TotalPages
+            });
         }
 
         [HttpPost]
         public async Task<IActionResult> Post([FromBody] CustomerPriceDTO priceDTO)
         {
-            if (priceDTO.CustomerId == null || priceDTO.ProductId == null) return BadRequest("Customer and Product is required.");
+            if (priceDTO.CustomerId == null || priceDTO.ProductId == null) throw new ApiException("Customer and Product is required.");
 
             var customer = await _context.Customers.FindAsync(priceDTO.CustomerId);
             var product = await _context.Products.FindAsync(priceDTO.ProductId);
-            if (customer == null || product == null) return BadRequest("Invalid Customer or Product.");
+            if (customer == null || product == null) throw new ApiException("Customer or Product not found.");
 
             var price = new CustomerPrice
             {
@@ -105,12 +111,12 @@ namespace ProDuck.Controllers
         {
             var price = await _context.CustomerPrice.FindAsync(id);
 
-            if (price == null) return NotFound();
-            if (priceDTO.CustomerId == null || priceDTO.ProductId == null) return BadRequest("Customer and Product is required.");
+            if (price == null) throw new ApiException("Price not found.");
+            if (priceDTO.CustomerId == null || priceDTO.ProductId == null) throw new ApiException("Customer and Product is required.");
 
             var customer = await _context.Customers.FindAsync(priceDTO.CustomerId);
             var product = await _context.Products.FindAsync(priceDTO.ProductId);
-            if (customer == null || product == null) return BadRequest("Customer or Product is invalid.");
+            if (customer == null || product == null) throw new ApiException("Customer or Product is invalid.");
 
             price.Price = priceDTO.Price;
             price.MinQty = priceDTO.MinQty;
@@ -118,20 +124,19 @@ namespace ProDuck.Controllers
             price.ProductId = (long)priceDTO.ProductId;
 
             await _context.SaveChangesAsync();
-            return Ok();
+
+            return NoContent();
         }
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(long id)
         {
-            var price = await _context.CustomerPrice.FindAsync(id);
-
-            if (price == null) return NotFound();
+            var price = await _context.CustomerPrice.FindAsync(id) ?? throw new ApiException("Price not found.");
 
             _context.CustomerPrice.Remove(price);
             await _context.SaveChangesAsync();
 
-            return Ok();
+            return NoContent();
         }
     }
 }

@@ -1,9 +1,12 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using AutoWrapper.Wrappers;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Razor.Language.Intermediate;
 using Microsoft.EntityFrameworkCore;
 using ProDuck.DTO;
 using ProDuck.Models;
 using ProDuck.QueryParams;
+using ProDuck.Responses;
+using ProDuck.Types;
 using System.Dynamic;
 
 namespace ProDuck.Controllers
@@ -20,23 +23,27 @@ namespace ProDuck.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<VendorDTO>>> Get([FromQuery] PaginationParams qp, [FromQuery] string keyword = "")
+        public async Task<PaginatedResponse> Get([FromQuery] PaginationParams qp, [FromQuery] string keyword = "")
         {
-            return await _context.Vendors
+            var result = await _context.Vendors
                 .Where(v => !v.IsDeleted)
                 .Where(v => v.Name.Contains(keyword))
                 .Select(v => VendorToDTO(v))
-                .Skip((qp.Page - 1) * qp.PageSize)
-                .Take(qp.PageSize)
-                .ToListAsync();
+                .ToPagedListAsync(qp.Page, qp.PageSize);
+
+            return new PaginatedResponse(result, new Pagination
+            {
+                Count = result.Count,
+                Page = qp.Page,
+                PageSize = qp.PageSize,
+                TotalPages = result.TotalPages
+            });
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult> Get(long id)
+        public async Task<PaginatedResponse> Get(long id)
         {
-            var vendor = await _context.Vendors.FindAsync(id);
-
-            if (vendor == null) return BadRequest();
+            var vendor = await _context.Vendors.FindAsync(id) ?? throw new ApiException("Vendor not found.");
 
             dynamic vendorDTO;
 
@@ -47,12 +54,15 @@ namespace ProDuck.Controllers
             vendorDTO.Contact = vendor.Contact;
             vendorDTO.IsDeleted = vendor.IsDeleted;
 
-            return Ok(vendorDTO);
+            return new PaginatedResponse(vendorDTO);
         }
 
         [HttpPost]
-        public async Task<ActionResult> Post([FromBody] VendorDTO payload)
+        public async Task<IActionResult> Post([FromBody] VendorDTO payload)
         {
+            var validation = ValidateVendor(payload);
+            if (!validation.IsValid) throw new ApiException(validation.ErrorMessages.First());
+
             var vendor = new Vendor
             {
                 Name = payload.Name,
@@ -63,15 +73,16 @@ namespace ProDuck.Controllers
             _context.Vendors.Add(vendor);
             await _context.SaveChangesAsync();
 
-            return Ok();
+            return NoContent();
         }
 
         [HttpPut("{id}")]
         public async Task<IActionResult> Put(long id, [FromBody] VendorDTO dto)
         {
-            var vendor = await _context.Vendors.FindAsync(id);
+            var validation = ValidateVendor(dto);
+            if (!validation.IsValid) throw new ApiException(validation.ErrorMessages.First());
 
-            if (vendor == null) return BadRequest();
+            var vendor = await _context.Vendors.FindAsync(id) ?? throw new ApiException("Unable to find Vendor");
 
             vendor.Name = dto.Name;
             vendor.Description = dto.Description;
@@ -83,9 +94,10 @@ namespace ProDuck.Controllers
             {
                 await _context.SaveChangesAsync();
             }
-            catch (DbUpdateConcurrencyException)
+            catch (DbUpdateConcurrencyException ex)
             {
-                throw;
+                if (ex.InnerException != null) throw new ApiException(ex.InnerException.Message);
+                throw new ApiException(ex.Message);
             }
 
             return NoContent();
@@ -94,9 +106,7 @@ namespace ProDuck.Controllers
         [HttpDelete("{id}")]
         public async Task<ActionResult> Delete(long id)
         {
-            var vendor = await _context.Vendors.FindAsync(id);
-
-            if (vendor == null) return NotFound();
+            var vendor = await _context.Vendors.FindAsync(id) ?? throw new ApiException("Could not find Vendor.");
 
             vendor.IsDeleted = true;
             _context.Entry(vendor).State = EntityState.Modified;
@@ -105,12 +115,23 @@ namespace ProDuck.Controllers
             {
                 await _context.SaveChangesAsync();
             }
-            catch (DbUpdateConcurrencyException)
+            catch (DbUpdateConcurrencyException ex)
             {
-                throw;
+                if (ex.InnerException != null) throw new ApiException(ex.InnerException.Message);
+                throw new ApiException(ex.Message);
             }
 
             return NoContent();
+        }
+
+        private static ValidationResult ValidateVendor(VendorDTO dto)
+        {
+            var result = new ValidationResult();
+
+            if (dto.Name.Length < 3) result.ErrorMessages.Add("Vendor Name should at least 3 characters.");
+
+            result.IsValid = true;
+            return result;
         }
 
         private bool VendorExists(long id)

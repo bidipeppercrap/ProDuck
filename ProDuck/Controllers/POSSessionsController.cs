@@ -1,8 +1,11 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using AutoWrapper.Wrappers;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ProDuck.DTO;
 using ProDuck.Models;
 using ProDuck.QueryParams;
+using ProDuck.Responses;
+using ProDuck.Types;
 using System.Runtime.InteropServices;
 
 namespace ProDuck.Controllers
@@ -70,19 +73,25 @@ namespace ProDuck.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<POSSessionDTO>>> Get([FromQuery] PaginationParams qp)
+        public async Task<PaginatedResponse> Get([FromQuery] PaginationParams qp)
         {
-            var sessions = await _context.POSSession
+            var result = await _context.POSSession
                 .Skip((qp.Page - 1) * qp.PageSize)
                 .Take(qp.PageSize)
                 .OrderByDescending(x => x.OpenedAt)
-                .ToListAsync();
+                .ToPagedListAsync(qp.PageSize, qp.Page);
 
-            return Ok(sessions);
+            return new PaginatedResponse(result, new Pagination
+            {
+                Count = result.Count,
+                Page = qp.Page,
+                PageSize = qp.PageSize,
+                TotalPages = result.TotalPages,
+            });
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<POSSessionDTO>> Get(long id)
+        public async Task<PaginatedResponse> Get(long id)
         {
             var session = await _context.POSSession
                 .Include(x => x.SessionOpener)
@@ -93,15 +102,15 @@ namespace ProDuck.Controllers
                 .Select(x => SessionToDTO(x))
                 .FirstOrDefaultAsync();
 
-            if (session == null) return NotFound();
+            if (session == null) throw new ApiException("Invalid Session Id.");
 
-            return Ok(session);
+            return new PaginatedResponse(session);
         }
 
         [HttpPost]
         public async Task<IActionResult> Post([FromBody] POSSessionDTO sessionDTO)
         {
-            if (await IsPOSActive(sessionDTO.POSId)) return BadRequest("POS is already has an active session.");
+            if (await IsPOSActive(sessionDTO.POSId)) throw new ApiException("POS is already has an active session.");
 
             var session = new POSSession
             {
@@ -114,7 +123,7 @@ namespace ProDuck.Controllers
             _context.POSSession.Add(session);
             await _context.SaveChangesAsync();
 
-            return Ok();
+            return NoContent();
         }
 
         [HttpPut("close/{id}")]
@@ -122,8 +131,8 @@ namespace ProDuck.Controllers
         {
             var session = await _context.POSSession.FindAsync(id);
 
-            if (session == null) return NotFound();
-            if (session.ClosedAt != null) return BadRequest("Session already closed.");
+            if (session == null) throw new ApiException("Session not found.");
+            if (session.ClosedAt != null) throw new ApiException("Session already closed.");
 
             session.ClosingBalance = sessionDTO.ClosingBalance;
             session.ClosingRemark = sessionDTO.ClosingRemark;
@@ -131,7 +140,7 @@ namespace ProDuck.Controllers
 
             await _context.SaveChangesAsync();
 
-            return Ok();
+            return NoContent();
         }
 
         [HttpPut("{id}")]
@@ -139,7 +148,7 @@ namespace ProDuck.Controllers
         {
             var session = await _context.POSSession.FindAsync(id);
 
-            if (session == null) return NotFound();
+            if (session == null) throw new ApiException("Session not found.");
 
             session.OpeningBalance = sessionDTO.OpeningBalance;
             session.ClosingRemark = sessionDTO.ClosingRemark;
@@ -147,7 +156,7 @@ namespace ProDuck.Controllers
 
             await _context.SaveChangesAsync();
 
-            return Ok();
+            return NoContent();
         }
     }
 }

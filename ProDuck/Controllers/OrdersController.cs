@@ -1,9 +1,12 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using AutoWrapper.Wrappers;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ProDuck.DTO;
 using ProDuck.Models;
 using ProDuck.QueryParams;
+using ProDuck.Responses;
 using ProDuck.Services;
+using ProDuck.Types;
 
 namespace ProDuck.Controllers
 {
@@ -74,7 +77,7 @@ namespace ProDuck.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<OrderDTO>>> Get([FromQuery] PaginationParams qp, [FromQuery] long? userId, [FromQuery] long? customerId)
+        public async Task<PaginatedResponse> Get([FromQuery] PaginationParams qp, [FromQuery] long? userId, [FromQuery] long? customerId)
         {
             IQueryable<Order> whereQuery = _context.Orders
                 .Include(x => x.ServedBy)
@@ -86,16 +89,22 @@ namespace ProDuck.Controllers
 
             var orders = await whereQuery
                 .Select(_ => OrderToDTO(_))
-                .Skip((qp.Page - 1) * qp.PageSize)
-                .Take(qp.PageSize)
-                .ToListAsync();
+                .ToPagedListAsync(qp.Page, qp.PageSize);
 
-            return Ok(orders);
+            return new PaginatedResponse(orders, new Pagination
+            {
+                Count = orders.Count,
+                Page = qp.Page,
+                PageSize = qp.PageSize,
+                TotalPages = orders.TotalPages
+            });
         }
 
         [HttpGet("possessions/{id}")]
-        public async Task<ActionResult<IEnumerable<OrderDTO>>> GetBySession(long id, [FromQuery] PaginationParams qp, [FromQuery] long? userId, [FromQuery] long? customerId)
+        public async Task<PaginatedResponse> GetBySession(long id, [FromQuery] PaginationParams qp, [FromQuery] long? userId, [FromQuery] long? customerId)
         {
+            var posSession = await _context.POSSession.FindAsync(id) ?? throw new ApiException("PoS Session not found.");
+
             IQueryable<Order> whereQuery = _context.Orders
                 .Include(x => x.ServedBy)
                 .Include(x => x.Customer)
@@ -107,16 +116,22 @@ namespace ProDuck.Controllers
             var orders = await whereQuery
                 .Where(_ => _.POSSessionId == id)
                 .Select(_ => OrderToDTO(_))
-                .Skip((qp.Page - 1) * qp.PageSize)
-                .Take(qp.PageSize)
-                .ToListAsync();
+                .ToPagedListAsync(qp.Page, qp.PageSize);
 
-            return Ok(orders);
+            return new PaginatedResponse(orders, new Pagination
+            {
+                Count = orders.Count,
+                Page = qp.Page,
+                PageSize = qp.PageSize,
+                TotalPages = orders.TotalPages
+            });
         }
 
         [HttpGet("poses/{id}")]
-        public async Task<ActionResult<IEnumerable<OrderDTO>>> GetByPOS(long id, [FromQuery] PaginationParams qp, [FromQuery] long? userId, [FromQuery] long? customerId)
+        public async Task<PaginatedResponse> GetByPOS(long id, [FromQuery] PaginationParams qp, [FromQuery] long? userId, [FromQuery] long? customerId)
         {
+            var pos = await _context.PointOfSale.FindAsync(id) ?? throw new ApiException("PoS not found.");
+
             IQueryable<Order> whereQuery = _context.Orders
                 .Include(x => x.ServedBy)
                 .Include(x => x.Customer)
@@ -129,15 +144,19 @@ namespace ProDuck.Controllers
             var orders = await whereQuery
                 .Where(_ => _.POSSession.POSId == id)
                 .Select(_ => OrderToDTO(_))
-                .Skip((qp.Page - 1) * qp.PageSize)
-                .Take(qp.PageSize)
-                .ToListAsync();
+                .ToPagedListAsync(qp.Page, qp.PageSize);
 
-            return Ok(orders);
+            return new PaginatedResponse(orders, new Pagination
+            {
+                Count = orders.Count,
+                TotalPages = orders.TotalPages,
+                Page = qp.Page,
+                PageSize = qp.PageSize
+            });
         }
 
         [HttpPost("return")]
-        public async Task<ActionResult<IEnumerable<OrderDTO>>> PostToReturn([FromBody] List<OrderDTOItem> itemsDTO)
+        public async Task<PaginatedResponse> PostToReturn([FromBody] List<OrderDTOItem> itemsDTO)
         {
             var whereQuery = _context.Orders
                 .Include(x => x.ServedBy)
@@ -158,16 +177,15 @@ namespace ProDuck.Controllers
 
             var result = orders.OrderByDescending(x => x.CreatedAt);
 
-            return Ok(result);
+            return new PaginatedResponse(result);
         }
 
         [HttpPost]
         public async Task<IActionResult> Post([FromBody] OrderCreateDTO orderDTO)
         {
             using var transaction = _context.Database.BeginTransaction();
-            var pos = await _context.PointOfSale.FindAsync(orderDTO.POSId);
 
-            if (pos == null) return BadRequest(new List<string> { "No Point of Sale found.", "Try relogging to find a new PoS." });
+            var pos = await _context.PointOfSale.FindAsync(orderDTO.POSId) ?? throw new ApiException("No PoS found, try relogging the application.");
 
             try
             {
@@ -229,9 +247,10 @@ namespace ProDuck.Controllers
 
                 await transaction.CommitAsync();
             }
-            catch (Exception e)
+            catch (Exception ex)
             {
-                return BadRequest(new List<string> { e.Message });
+                if (ex.InnerException != null) throw new ApiException(ex.InnerException.Message);
+                throw new ApiException(ex.Message);
             }
 
             return NoContent();

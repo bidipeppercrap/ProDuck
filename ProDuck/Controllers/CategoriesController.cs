@@ -74,6 +74,7 @@ namespace ProDuck.Controllers
         public async Task<ActionResult<ProductCategoryDTO>> PostCategory(ProductCategoryDTO categoryDTO)
         {
             if (categoryDTO.Name == null) throw new ApiException("Category Name is required.");
+            if (categoryDTO.Name.Length < 3) throw new ApiException("Category Name must be longer than 2 characters.");
 
             var category = new ProductCategory
             {
@@ -83,12 +84,7 @@ namespace ProDuck.Controllers
 
             if (categoryDTO.ProductCategoryId != null)
             {
-                var parentCategory = await _context.ProductCategories.FindAsync(categoryDTO.ProductCategoryId);
-
-                if (parentCategory == null)
-                {
-                    throw new ApiException("Parent Category not found.");
-                }
+                var parentCategory = await _context.ProductCategories.FindAsync(categoryDTO.ProductCategoryId) ?? throw new ApiException("Parent Category not found.");
 
                 category.ProductCategoryId = categoryDTO.ProductCategoryId;
             }

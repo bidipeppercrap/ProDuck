@@ -1,8 +1,11 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using AutoWrapper.Wrappers;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ProDuck.DTO;
 using ProDuck.Models;
 using ProDuck.QueryParams;
+using ProDuck.Responses;
+using ProDuck.Types;
 
 namespace ProDuck.Controllers
 {
@@ -17,22 +20,41 @@ namespace ProDuck.Controllers
             _context = context;
         }
 
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<CustomerDTO>>> Get([FromQuery] PaginationParams qp, [FromQuery] string keyword = "")
+        private static ValidationResult ValidateCustomer(CustomerDTO dto)
         {
-            return await _context.Customers
+            var result = new ValidationResult();
+
+            if (dto.Name.Length < 3) result.ErrorMessages.Add("Name length must be longer than 2 characters.");
+
+            if (result.ErrorMessages.Count > 0) return result;
+
+            result.IsValid = true;
+
+            return result;
+        }
+
+        [HttpGet]
+        public async Task<PaginatedResponse> Get([FromQuery] PaginationParams qp, [FromQuery] string keyword = "")
+        {
+            var result = await _context.Customers
                 .Include(x => x.ProductPrices)
                     .ThenInclude(pp => pp.Product)
                 .Where(x => x.Name.ToLower().Contains(keyword.ToLower()))
                 .Where(x => x.IsDeleted == false)
                 .Select(x => CustomerToDTO(x))
-                .Skip((qp.Page - 1) * qp.PageSize)
-                .Take(qp.PageSize)
-                .ToListAsync();
+                .ToPagedListAsync(qp.Page, qp.PageSize);
+
+            return new PaginatedResponse(result, new Pagination
+            {
+                Count = result.Count,
+                Page = qp.Page,
+                PageSize = qp.PageSize,
+                TotalPages = result.TotalPages
+            });
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<CustomerDTO>> Get(long id)
+        public async Task<PaginatedResponse> Get(long id)
         {
             var customer = await _context.Customers
                 .Include(x => x.ProductPrices)
@@ -40,14 +62,18 @@ namespace ProDuck.Controllers
                 .Where(x => x.Id == id)
                 .FirstOrDefaultAsync();
 
-            if (customer == null) return NotFound();
+            if (customer == null) throw new ApiException("Customer not found.");
 
-            return Ok(customer);
+            return new PaginatedResponse(CustomerToDTO(customer));
         }
 
         [HttpPost]
         public async Task<IActionResult> Post([FromBody] CustomerDTO customerDTO)
         {
+            var validation = ValidateCustomer(customerDTO);
+
+            if (!validation.IsValid) throw new ApiException(validation.ErrorMessages.First());
+
             var customer = new Customer
             {
                 Name = customerDTO.Name,
@@ -64,9 +90,13 @@ namespace ProDuck.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> Put(long id, [FromBody] CustomerDTO customerDTO)
         {
+            var validation = ValidateCustomer(customerDTO);
+
+            if (!validation.IsValid) throw new ApiException(validation.ErrorMessages.First());
+
             var customer = await _context.Customers.FindAsync(id);
 
-            if (customer == null) return NotFound();
+            if (customer == null) throw new ApiException("Customer not found.");
 
             customer.Name = customerDTO.Name;
             customer.Address = customerDTO.Address;
@@ -82,7 +112,7 @@ namespace ProDuck.Controllers
         {
             var customer = await _context.Customers.FindAsync(id);
 
-            if (customer == null) return NotFound();
+            if (customer == null) throw new ApiException("Customer not found");
 
             customer.IsDeleted = true;
 
