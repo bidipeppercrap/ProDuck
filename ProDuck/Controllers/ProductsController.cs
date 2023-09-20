@@ -2,12 +2,15 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using AutoWrapper.Wrappers;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ProDuck.DTO;
 using ProDuck.Models;
 using ProDuck.QueryParams;
+using ProDuck.Responses;
+using ProDuck.Types;
 
 namespace ProDuck.Controllers
 {
@@ -23,13 +26,15 @@ namespace ProDuck.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<ProductDTO>>> GetProducts([FromQuery] long? categoryId,[FromQuery] PaginationParams qp)
+        public async Task<PaginatedResponse> GetProducts([FromQuery] long? categoryId,[FromQuery] PaginationParams qp)
         {
             if (_context.Products == null)
             {
-                return NotFound();
+                throw new ApiException("Product not found");
             }
             var category = categoryId != null ? await _context.ProductCategories.FindAsync(categoryId) : null;
+
+            if (category == null && categoryId != null) throw new ApiException("Category not found.");
 
             var q = _context.Products
                 .Where(x => x.Deleted == false); ;
@@ -38,21 +43,30 @@ namespace ProDuck.Controllers
                 .Where(x => x.Deleted == false)
                 .Where(x => x.Category == category);
 
-            return await q
+            var products = await q
                 .Include(x => x.Category)
                 .Include(_ => _.Stocks)
                 .Select(x => ProductToDTO(x))
-                .Skip((qp.Page - 1) * qp.PageSize)
-                .Take(qp.PageSize)
-                .ToListAsync();
+                .ToPagedListAsync(qp.Page, qp.PageSize);
+
+            return new PaginatedResponse(
+                new Pagination
+                {
+                    Count = products.Count,
+                    PageSize = products.PageSize,
+                    Page = products.PageNumber,
+                    TotalPages = products.TotalPages
+                },
+                products
+            );
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<ProductDTO>> GetProduct(long id)
+        public async Task<PaginatedResponse> GetProduct(long id)
         {
           if (_context.Products == null)
           {
-              return NotFound();
+            throw new ApiException("Product not found.", 404);
           }
             var product = await _context.Products
                 .Where(product => product.Id == id)
@@ -61,10 +75,10 @@ namespace ProDuck.Controllers
 
             if (product == null)
             {
-                return NotFound();
+                throw new ApiException("Product not found.", 404);
             }
 
-            return ProductToDTO(product);
+            return new PaginatedResponse(product);
         }
 
         [HttpPut("{id}")]
@@ -72,12 +86,12 @@ namespace ProDuck.Controllers
         {
             var product = await _context.Products.FindAsync(id);
 
-            if (product == null) return NotFound();
+            if (product == null) throw new ApiException("Product not found.", 404);
 
             if (productDTO.CategoryId != null)
             {
                 var category = await _context.ProductCategories.FindAsync(productDTO.CategoryId);
-                if (category == null) return BadRequest();
+                if (category == null) new ApiException("Category not found.", 400);
 
                 product.Category = category;
             }
@@ -88,7 +102,14 @@ namespace ProDuck.Controllers
             product.Cost = productDTO.Cost;
             product.Barcode = productDTO.Barcode;
 
-            _context.Products.Update(product);
+            try
+            {
+                _context.Products.Update(product);
+            }
+            catch (Exception ex)
+            {
+                throw new ApiException(ex.Message);
+            }
 
             await _context.SaveChangesAsync();
 
@@ -108,7 +129,7 @@ namespace ProDuck.Controllers
             if (productDTO.CategoryId != null)
             {
                 category = await _context.ProductCategories.FindAsync(productDTO.CategoryId);
-                if (category == null) return BadRequest();
+                if (category == null) throw new ApiException("Category not found", 400);
             }
 
             if (productDTO.CategoryId == null) category = null;
@@ -122,8 +143,16 @@ namespace ProDuck.Controllers
                 Category = category
             };
 
-            _context.Products.Add(product);
-            await _context.SaveChangesAsync();
+            try
+            {
+                _context.Products.Add(product);
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                if (ex.InnerException != null) throw new ApiException(ex.InnerException.Message);
+                throw new ApiException(ex.Message);
+            }
 
             return CreatedAtAction(nameof(GetProduct), new { id = product.Id }, ProductToDTO(product));
         }
@@ -133,12 +162,12 @@ namespace ProDuck.Controllers
         {
             if (_context.Products == null)
             {
-                return NotFound();
+                throw new ApiException("Product not found", 404);
             }
             var product = await _context.Products.FindAsync(id);
             if (product == null)
             {
-                return NotFound();
+                throw new ApiException("Product not found", 404);
             }
 
             product.Deleted = true;

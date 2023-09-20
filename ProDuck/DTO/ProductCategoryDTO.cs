@@ -7,5 +7,6 @@
         public string? Description { get; set; }
         public long? ProductCategoryId { get; set; }
         public int? ProductsCount { get; set; }
+        public int? ChildCategoriesCount { get; set; }
     }
 }

@@ -1,8 +1,11 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using AutoWrapper.Wrappers;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ProDuck.DTO;
 using ProDuck.Models;
 using ProDuck.QueryParams;
+using ProDuck.Responses;
+using ProDuck.Types;
 
 namespace ProDuck.Controllers
 {
@@ -25,53 +28,52 @@ namespace ProDuck.Controllers
                 Name = category.Name,
                 Description = category.Description,
                 ProductCategoryId = category.ProductCategoryId,
-                ProductsCount = category.Products.Count
+                ProductsCount = category.Products.Count,
+                ChildCategoriesCount = category.ChildCategories.Count
             };
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<ProductCategoryDTO>>> GetCategories([FromQuery] long? exclude, [FromQuery] PaginationParams qp)
+        public async Task<PaginatedResponse> GetCategories([FromQuery] long? exclude, [FromQuery] PaginationParams qp)
         {
-            var whereQuery = _context.ProductCategories;
+            var whereQuery = _context.ProductCategories
+                .Include(x => x.Products)
+                .Include(x => x.ChildCategories)
+                .AsQueryable();
 
             if (exclude != null)
             {
-                return await whereQuery
+                var data = await whereQuery
+                    
                     .Where(x => x.Id != exclude)
-                    .Include(x => x.Products)
                     .Select(x => CategoryToDTO(x))
-                    .Skip((qp.Page - 1) * qp.PageSize)
-                    .Take(qp.PageSize)
-                    .ToListAsync(); 
+                    .ToPagedListAsync(qp.Page, qp.PageSize);
+
+                return new PaginatedResponse(data, new Pagination { Count = data.Count, Page = qp.Page, PageSize = qp.PageSize, TotalPages = data.TotalPages });
             }
 
-            return await whereQuery
-                .Include(x => x.Products)
+            var result = await whereQuery
                 .Select(x => CategoryToDTO(x))
-                .Skip((qp.Page - 1) * qp.PageSize)
-                .Take(qp.PageSize)
-                .ToListAsync();
+                .ToPagedListAsync(qp.Page, qp.PageSize);
+
+            return new PaginatedResponse(result, new Pagination { Count = result.Count, Page = qp.Page, PageSize = qp.PageSize, TotalPages = result.TotalPages });
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<ProductCategoryDTO>> GetCategory(long id)
+        public async Task<PaginatedResponse> GetCategory(long id)
         {
             var category = await _context.ProductCategories
-                .Where(x => x.Id == id)
                 .Include(x => x.Products)
+                .Include(x => x.ChildCategories)
+                .Where(x => x.Id == id)
                 .FirstOrDefaultAsync();
 
-            if (category == null)
-            {
-                return NotFound();
-            }
-
-            return CategoryToDTO(category);
+            return category == null ? throw new ApiException("Category not found.", 404) : new PaginatedResponse(CategoryToDTO(category));
         }
 
         [HttpPost]
         public async Task<ActionResult<ProductCategoryDTO>> PostCategory(ProductCategoryDTO categoryDTO)
         {
-            if (categoryDTO.Name == null) { return BadRequest(); }
+            if (categoryDTO.Name == null) throw new ApiException("Category Name is required.");
 
             var category = new ProductCategory
             {
@@ -85,7 +87,7 @@ namespace ProDuck.Controllers
 
                 if (parentCategory == null)
                 {
-                    return BadRequest();
+                    throw new ApiException("Parent Category not found.");
                 }
 
                 category.ProductCategoryId = categoryDTO.ProductCategoryId;
@@ -102,13 +104,13 @@ namespace ProDuck.Controllers
         {
             var category = await _context.ProductCategories.FindAsync(id);
 
-            if (category == null) return NotFound();
-            if (category.Id == categoryDTO.ProductCategoryId) return BadRequest();
+            if (category == null) throw new ApiException("Category not found", 404);
+            if (category.Id == categoryDTO.ProductCategoryId) throw new ApiException("Parent Category cannot be thy self.");
 
             if (categoryDTO.ProductCategoryId != null)
             {
                 var parentCategory = await _context.ProductCategories.FindAsync(categoryDTO.ProductCategoryId);
-                if (parentCategory == null) return BadRequest();
+                if (parentCategory == null) throw new ApiException("Parent Category not found.");
             }
 
             await _context.ProductCategories
@@ -126,9 +128,7 @@ namespace ProDuck.Controllers
         {
             using var transaction = _context.Database.BeginTransaction();
 
-            var category = await _context.ProductCategories.FindAsync(id);
-
-            if (category == null) return NotFound();
+            var category = await _context.ProductCategories.FindAsync(id) ?? throw new ApiException("Category not found.", 404);
 
             await _context.ProductCategories
                 .Where(c => c.ParentCategory == category)

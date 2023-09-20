@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using ProDuck.Models;
 using System.Text.Json.Serialization;
+using AutoWrapper;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,6 +20,8 @@ builder.Services.AddDbContext<ProDuckContext>(opt =>
 var app = builder.Build();
 
 app.UseAuthorization();
+
+app.UseApiResponseAndExceptionWrapper(new AutoWrapperOptions { UseCustomSchema = true });
 
 app.MapControllers();
 
