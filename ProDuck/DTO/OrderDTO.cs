@@ -28,7 +28,7 @@
         public long UserId { get; set; }
         public UserDTO? ServedBy { get; set; }
 
-        public long CustomerId { get; set; }
+        public long? CustomerId { get; set; }
         public OrderDTOCustomer? Customer { get; set; }
 
         public List<OrderDTOItem> Items { get; set; } = new List<OrderDTOItem>();
@@ -36,6 +36,9 @@
     public class OrderDTO : OrderBaseDTO
     {
         public long POSSessionId { get; set; }
+        public decimal TotalPrice { get; set; }
+        public decimal TotalCost { get; set; }
+        public bool HasReturn { get; set; }
     }
     public class OrderCreateDTO : OrderBaseDTO
     {

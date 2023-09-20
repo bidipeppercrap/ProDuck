@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using ProDuck.DTO;
 using ProDuck.Models;
+using ProDuck.QueryParams;
 using ProDuck.Services;
 
 namespace ProDuck.Controllers
@@ -17,6 +18,51 @@ namespace ProDuck.Controllers
             _context = context;
         }
 
+        private static OrderDTO OrderToDTO(Order order)
+        {
+            var dto = new OrderDTO
+            {
+                Id = order.Id,
+                CreatedAt = order.CreatedAt,
+                CustomerId = order.CustomerId,
+                Customer = order.Customer != null ? new OrderDTOCustomer
+                {
+                    Id = order.Customer.Id,
+                    Name = order.Customer.Name,
+                } : null,
+                UserId = order.UserId,
+                ServedBy = new UserDTO
+                {
+                    Id = order.ServedBy.Id,
+                    Name = order.ServedBy.Name,
+                    Username = order.ServedBy.Username
+                },
+                POSSessionId = order.POSSessionId,
+                TotalPrice = order.Items.Sum(_ => _.Price * _.Qty),
+                TotalCost = order.Items.Sum(_ => _.Cost * _.Qty),
+                HasReturn = order.Items.Any(_ => _.Qty < 0)
+            };
+
+            return dto;
+        }
+
+        private static OrderDTOItem ItemToDTO(OrderItem item)
+        {
+            var dto = new OrderDTOItem
+            {
+                Id = item.Id,
+                Price = item.Price,
+                Cost = item.Cost,
+                Qty = item.Qty,
+                Product = new OrderDTOItemProduct
+                {
+                    Id = item.ProductId
+                }
+            };
+
+            return dto;
+        }
+
         private async Task<bool> IsSessionClosed(long sessionId)
         {
             var session = await _context.POSSession.FindAsync(sessionId);
@@ -27,18 +73,89 @@ namespace ProDuck.Controllers
             return true;
         }
 
-        // GET: api/<OrdersController>
         [HttpGet]
-        public IEnumerable<string> Get()
+        public async Task<ActionResult<IEnumerable<OrderDTO>>> Get([FromQuery] PaginationParams qp, [FromQuery] long? userId, [FromQuery] long? customerId)
         {
-            return new string[] { "value1", "value2" };
+            IQueryable<Order> whereQuery = _context.Orders
+                .Include(_ => _.ServedBy)
+                .Include(_ => _.Customer)
+                .Include(_ => _.Items);
+
+            if (userId != null) whereQuery = whereQuery.Where(_ => _.UserId == userId);
+            if (customerId != null) whereQuery = whereQuery.Where(_ => _.CustomerId == customerId);
+
+            var orders = await whereQuery
+                .Select(_ => OrderToDTO(_))
+                .Skip((qp.Page - 1) * qp.PageSize)
+                .Take(qp.PageSize)
+                .ToListAsync();
+
+            return Ok(orders);
         }
 
-        // GET api/<OrdersController>/5
-        [HttpGet("{id}")]
-        public string Get(int id)
+        [HttpGet("possessions/{id}")]
+        public async Task<ActionResult<IEnumerable<OrderDTO>>> GetBySession(long id, [FromQuery] PaginationParams qp, [FromQuery] long? userId, [FromQuery] long? customerId)
         {
-            return "value";
+            IQueryable<Order> whereQuery = _context.Orders
+                .Include(_ => _.ServedBy)
+                .Include(_ => _.Customer)
+                .Include(_ => _.Items);
+
+            if (userId != null) whereQuery = whereQuery.Where(_ => _.UserId == userId);
+            if (customerId != null) whereQuery = whereQuery.Where(_ => _.CustomerId == customerId);
+
+            var orders = await whereQuery
+                .Where(_ => _.POSSessionId == id)
+                .Select(_ => OrderToDTO(_))
+                .Skip((qp.Page - 1) * qp.PageSize)
+                .Take(qp.PageSize)
+                .ToListAsync();
+
+            return Ok(orders);
+        }
+
+        [HttpGet("poses/{id}")]
+        public async Task<ActionResult<IEnumerable<OrderDTO>>> GetByPOS(long id, [FromQuery] PaginationParams qp, [FromQuery] long? userId, [FromQuery] long? customerId)
+        {
+            IQueryable<Order> whereQuery = _context.Orders
+                .Include(_ => _.ServedBy)
+                .Include(_ => _.Customer)
+                .Include(_ => _.POSSession)
+                .Include(_ => _.Items);
+
+            if (userId != null) whereQuery = whereQuery.Where(_ => _.UserId == userId);
+            if (customerId != null) whereQuery = whereQuery.Where(_ => _.CustomerId == customerId);
+
+            var orders = await whereQuery
+                .Where(_ => _.POSSession.POSId == id)
+                .Select(_ => OrderToDTO(_))
+                .Skip((qp.Page - 1) * qp.PageSize)
+                .Take(qp.PageSize)
+                .ToListAsync();
+
+            return Ok(orders);
+        }
+
+        [HttpPost("return")]
+        public async Task<ActionResult<IEnumerable<OrderDTO>>> PostToReturn([FromBody] List<OrderDTOItem> itemsDTO)
+        {
+            var whereQuery = _context.Orders
+                .Include(_ => _.ServedBy)
+                .Include(_ => _.Customer)
+                .Include(_ => _.POSSession)
+                .Include(_ => _.Items)
+                .AsQueryable();
+
+            foreach(var dto in itemsDTO)
+            {
+                whereQuery = whereQuery.Where(x => x.Items.Any(i => i.ProductId == dto.Product.Id && i.Qty >= dto.Qty));
+            }
+
+            var orders = await whereQuery
+                .Select(_ => OrderToDTO(_))
+                .ToListAsync();
+
+            return Ok(orders);
         }
 
         [HttpPost]
