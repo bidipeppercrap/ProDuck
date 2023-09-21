@@ -43,10 +43,14 @@ namespace ProDuck.Controllers
         }
 
         [HttpGet]
-        public async Task<PaginatedResponse> Get([FromQuery] PaginationParams qp, [FromQuery] string keyword = "")
+        public async Task<PaginatedResponse> Get([FromQuery] PaginationParams qp, [FromQuery] long? claimId, [FromQuery] string keyword = "")
         {
-            var result = await _context.Users
-                .Where(x => x.Username.ToLower().Contains(keyword) || (x.Name == null || x.Name.ToLower().Contains(keyword)))
+            IQueryable<User> whereQuery = _context.Users
+                .Where(x => x.Username.ToLower().Contains(keyword.ToLower()) || (x.Name != null && x.Name.ToLower().Contains(keyword.ToLower())));
+
+            if (claimId != null) whereQuery = whereQuery.Where(x => x.Claims.Any(c => c.Id == claimId));
+
+            var result = await whereQuery
                 .Where(x => x.IsDeleted == false)
                 .Select(x => UserToDTO(x))
                 .ToPagedListAsync(qp.Page, qp.PageSize);

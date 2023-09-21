@@ -7,4 +7,9 @@
 
         public List<UserDTO> Users { get; set; } = new();
     }
+    public class UserClaimDTO
+    {
+        public long UserId { get; set; }
+        public long ClaimId { get; set; }
+    }
 }

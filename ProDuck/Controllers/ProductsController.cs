@@ -26,30 +26,38 @@ namespace ProDuck.Controllers
         }
 
         [HttpGet]
-        public async Task<PaginatedResponse> GetProducts([FromQuery] long? categoryId,[FromQuery] PaginationParams qp)
+        public async Task<PaginatedResponse> GetProducts([FromQuery] long? categoryId, [FromQuery] PaginationParams qp, [FromQuery] string keyword = "")
         {
             if (_context.Products == null)
             {
                 throw new ApiException("Product not found");
             }
             var category = categoryId != null ? await _context.ProductCategories.FindAsync(categoryId) : null;
-
             if (category == null && categoryId != null) throw new ApiException("Category not found.");
 
             var q = _context.Products
-                .Where(x => x.Deleted == false); ;
+                .Include(x => x.Category)
+                .Include(_ => _.Stocks)
+                .Where(x => x.Deleted == false)
+                .AsQueryable();
 
             if (categoryId != null) q = _context.Products
                 .Where(x => x.Deleted == false)
                 .Where(x => x.Category == category);
 
-            var products = await q
-                .Include(x => x.Category)
-                .Include(_ => _.Stocks)
-                .Select(x => ProductToDTO(x))
-                .ToPagedListAsync(qp.Page, qp.PageSize);
+            var keywords = keyword.Trim().Split(" ");
+            foreach(var word in keywords)
+            {
+                q = q.Where(x => x.Name.Contains(word));
+            }
 
-            return new PaginatedResponse(
+            try
+            {
+                var products = await q
+                    .Select(x => ProductToDTO(x))
+                    .ToPagedListAsync(qp.Page, qp.PageSize);
+
+                return new PaginatedResponse(
                 new Pagination
                 {
                     Count = products.Count,
@@ -59,6 +67,12 @@ namespace ProDuck.Controllers
                 },
                 products
             );
+            }
+            catch (Exception ex)
+            {
+                if (ex.InnerException != null) throw new ApiException(ex.InnerException.Message);
+                throw new ApiException(ex.Message);
+            }
         }
 
         [HttpGet("{id}")]

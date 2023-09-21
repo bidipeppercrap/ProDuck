@@ -65,6 +65,26 @@ namespace ProDuck.Controllers
             return NoContent();
         }
 
+        [HttpPost("assign")]
+        public async Task<IActionResult> PostAssignment([FromBody] UserClaimDTO dto)
+        {
+            var user = await _context.Users.FindAsync(dto.UserId) ?? throw new ApiException("User not found.");
+            var claim = await _context.Claims.FindAsync(dto.ClaimId) ?? throw new ApiException("Claim not found.");
+
+            try
+            {
+                claim.Users.Add(user);
+                await _context.SaveChangesAsync();
+            }
+            catch(Exception ex)
+            {
+                if (ex.InnerException != null) throw new ApiException(ex.InnerException.Message);
+                throw new ApiException(ex.Message);
+            }
+
+            return NoContent();
+        }
+
         [HttpPut("{id}")]
         public async Task<IActionResult> Put(long id, [FromBody] ClaimDTO claimDTO)
         {
