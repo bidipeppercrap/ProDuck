@@ -35,12 +35,16 @@ namespace ProDuck.Controllers
         }
 
         [HttpGet]
-        public async Task<PaginatedResponse> Get([FromQuery] PaginationParams qp)
+        public async Task<PaginatedResponse> Get([FromQuery] PaginationParams qp, [FromQuery] DateOnly startDate, [FromQuery] DateOnly endDate)
         {
             try
             {
                 var result = await _context.Products
                     .Include(x => x.OrderItems)
+                        .ThenInclude(oi => oi.Order)
+                    .Where(x =>
+                        x.OrderItems.Any(oi => DateOnly.FromDateTime(oi.Order.CreatedAt) >= startDate) &&
+                        x.OrderItems.Any(oi => DateOnly.FromDateTime(oi.Order.CreatedAt) <= endDate))
                     .Where(x => x.OrderItems.Sum(oi => oi.Qty) != 0)
                     .OrderByDescending(x => x.OrderItems.Sum(oi => oi.Qty))
                     .Select(x => SaleItemToDTO(x))
