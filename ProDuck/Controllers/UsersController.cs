@@ -21,13 +21,30 @@ namespace ProDuck.Controllers
             _context = context;
         }
 
-        private static UserDTO UserToDTO(User user) =>
-            new()
+        private static UserDTO UserToDTO(User user)
+        {
+            var claims = new List<UserDTOClaim>();
+
+            foreach(var claim in user.Claims)
+            {
+                claims.Add(new UserDTOClaim
+                {
+                    Id = claim.Id,
+                    Name = claim.Name,
+                });
+            }
+
+            var dto = new UserDTO
             {
                 Id = user.Id,
                 Name = user.Name,
-                Username = user.Username
+                Username = user.Username,
+                Claims = claims
             };
+
+            return dto;
+        }
+            
         private static ValidationResult ValidateDTO(UserCreateDTO dto)
         {
             var result = new ValidationResult();
@@ -43,12 +60,13 @@ namespace ProDuck.Controllers
         }
 
         [HttpGet]
-        public async Task<PaginatedResponse> Get([FromQuery] PaginationParams qp, [FromQuery] long? claimId, [FromQuery] string keyword = "")
+        public async Task<PaginatedResponse> Get([FromQuery] PaginationParams qp, [FromQuery] long? claimId, [FromQuery] long? posId, [FromQuery] string keyword = "")
         {
             IQueryable<User> whereQuery = _context.Users
-                .Where(x => x.Username.ToLower().Contains(keyword.ToLower()) || (x.Name != null && x.Name.ToLower().Contains(keyword.ToLower())));
+                .Where(x => x.Username.Contains(keyword) || (x.Name != null && x.Name.Contains(keyword)));
 
             if (claimId != null) whereQuery = whereQuery.Where(x => x.Claims.Any(c => c.Id == claimId));
+            if (posId != null) whereQuery = whereQuery.Where(x => x.AssignedPOSes.Any(p => p.Id == posId));
 
             var result = await whereQuery
                 .Where(x => x.IsDeleted == false)
@@ -67,9 +85,14 @@ namespace ProDuck.Controllers
         [HttpGet("{id}")]
         public async Task<PaginatedResponse> Get(long id)
         {
-            var user = await _context.Users.FindAsync(id) ?? throw new ApiException("User not found.");
+            var user = await _context.Users
+                .Include(x => x.Claims)
+                .Where(x => x.Id.Equals(id))
+                .Select(x => UserToDTO(x))
+                .FirstOrDefaultAsync()
+                ?? throw new ApiException("User not found.");
 
-            return new PaginatedResponse(UserToDTO(user));
+            return new PaginatedResponse(user);
         }
 
         [HttpPost]
@@ -89,6 +112,26 @@ namespace ProDuck.Controllers
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
+
+            return NoContent();
+        }
+
+        [HttpPost("assign/pos")]
+        public async Task<IActionResult> AssignToPOS([FromBody] UserPOSAssignDTO dto)
+        {
+            var pos = await _context.PointOfSale.FindAsync(dto.POSId) ?? throw new ApiException("POS not found.");
+            var user = await _context.Users.FindAsync(dto.UserId) ?? throw new ApiException("User not found.");
+
+            try
+            {
+                pos.AssignedUsers.Add(user);
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                if (ex.InnerException != null) throw new ApiException(ex.InnerException.Message);
+                throw new ApiException(ex.Message);
+            }
 
             return NoContent();
         }

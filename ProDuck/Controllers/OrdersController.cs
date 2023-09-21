@@ -77,18 +77,19 @@ namespace ProDuck.Controllers
         }
 
         [HttpGet]
-        public async Task<PaginatedResponse> Get([FromQuery] PaginationParams qp, [FromQuery] long? userId, [FromQuery] long? customerId)
+        public async Task<PaginatedResponse> Get([FromQuery] PaginationParams qp, [FromQuery] long? userId, [FromQuery] long? customerId, [FromQuery] DateOnly startDate, [FromQuery] DateOnly endDate)
         {
             IQueryable<Order> whereQuery = _context.Orders
                 .Include(x => x.ServedBy)
                 .Include(x => x.Customer)
-                .Include(x => x.Items);
+                .Include(x => x.Items)
+                .Where(x => DateOnly.FromDateTime(x.CreatedAt) >= startDate && DateOnly.FromDateTime(x.CreatedAt) <= endDate);
 
-            if (userId != null) whereQuery = whereQuery.Where(_ => _.UserId == userId);
-            if (customerId != null) whereQuery = whereQuery.Where(_ => _.CustomerId == customerId);
+            if (userId != null) whereQuery = whereQuery.Where(x => x.UserId == userId);
+            if (customerId != null) whereQuery = whereQuery.Where(x => x.CustomerId == customerId);
 
             var orders = await whereQuery
-                .Select(_ => OrderToDTO(_))
+                .Select(x => OrderToDTO(x))
                 .ToPagedListAsync(qp.Page, qp.PageSize);
 
             return new PaginatedResponse(orders, new Pagination

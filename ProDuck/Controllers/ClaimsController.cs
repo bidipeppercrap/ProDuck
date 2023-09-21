@@ -36,7 +36,7 @@ namespace ProDuck.Controllers
         public async Task<PaginatedResponse> Get([FromQuery] PaginationParams qp, [FromQuery] string keyword = "")
         {
             var result = await _context.Claims
-                .Where(x => x.Name.ToLower().Contains(keyword.ToLower()))
+                .Where(x => x.Name.Contains(keyword))
                 .ToPagedListAsync(qp.Page, qp.PageSize);
 
             return new PaginatedResponse(result, new Pagination

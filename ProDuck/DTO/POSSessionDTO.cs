@@ -22,6 +22,8 @@
         public decimal OpeningBalance { get; set; }
         public decimal ClosingBalance { get; set; }
         public int OrderCount { get; set; } = 0;
+        public decimal TotalSalesPrice { get; set; } = decimal.Zero;
+        public decimal TotalSalesCost { get; set; } = decimal.Zero;
 
         public long UserId { get; set; }
         public UserDTO? SessionOpener { get; set; }

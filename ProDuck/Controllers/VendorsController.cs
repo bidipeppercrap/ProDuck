@@ -25,9 +25,13 @@ namespace ProDuck.Controllers
         [HttpGet]
         public async Task<PaginatedResponse> Get([FromQuery] PaginationParams qp, [FromQuery] string keyword = "")
         {
-            var result = await _context.Vendors
+            var whereQuery = _context.Vendors
                 .Where(v => !v.IsDeleted)
-                .Where(v => v.Name.Contains(keyword))
+                .AsQueryable();
+            
+            foreach(var word in keyword.Trim().Split(" ")) whereQuery = whereQuery.Where(x => x.Name.Contains(word));
+
+            var result = await whereQuery
                 .Select(v => VendorToDTO(v))
                 .ToPagedListAsync(qp.Page, qp.PageSize);
 

@@ -23,18 +23,6 @@ namespace ProDuck.Controllers
 
         private static POSSessionDTO SessionToDTO(POSSession session)
         {
-            var orders = new List<POSSessionDTOOrder>();
-            foreach(var o in session.Orders)
-            {
-                orders.Add(new POSSessionDTOOrder
-                {
-                    Id = o.Id,
-                    CreatedAt = o.CreatedAt,
-                    TotalPrice = o.Items.Sum(x => x.Price * x.Qty),
-                    TotalCost = o.Items.Sum(x => x.Cost * x.Qty)
-                });
-            }
-
             var dto = new POSSessionDTO
             {
                 Id = session.Id,
@@ -44,6 +32,8 @@ namespace ProDuck.Controllers
                 OpeningBalance = session.OpeningBalance,
                 ClosingBalance = session.ClosingBalance,
                 OrderCount = session.Orders.Count,
+                TotalSalesPrice = session.Orders.Sum(o => o.Items.Sum(i => i.Price * i.Qty)),
+                TotalSalesCost = session.Orders.Sum(o => o.Items.Sum(i => i.Cost * i.Qty)),
                 SessionOpener = new UserDTO
                 {
                     Id = session.SessionOpener.Id,
@@ -55,8 +45,7 @@ namespace ProDuck.Controllers
                     Id = session.POS.Id,
                     Name = session.POS.Name,
                     Description = session.POS.Description
-                },
-                Orders = orders
+                }
             };
 
             return dto;
@@ -73,13 +62,15 @@ namespace ProDuck.Controllers
         }
 
         [HttpGet]
-        public async Task<PaginatedResponse> Get([FromQuery] PaginationParams qp)
+        public async Task<PaginatedResponse> Get([FromQuery] PaginationParams qp, [FromQuery] long? posId)
         {
-            var result = await _context.POSSession
-                .Skip((qp.Page - 1) * qp.PageSize)
-                .Take(qp.PageSize)
+            var whereQuery = _context.POSSession.AsQueryable();
+
+            if (posId != null) whereQuery = whereQuery.Where(x => x.POSId == posId);
+
+            var result = await whereQuery
                 .OrderByDescending(x => x.OpenedAt)
-                .ToPagedListAsync(qp.PageSize, qp.Page);
+                .ToPagedListAsync(qp.Page, qp.PageSize);
 
             return new PaginatedResponse(result, new Pagination
             {

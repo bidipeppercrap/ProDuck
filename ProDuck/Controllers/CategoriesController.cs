@@ -33,12 +33,17 @@ namespace ProDuck.Controllers
             };
 
         [HttpGet]
-        public async Task<PaginatedResponse> GetCategories([FromQuery] long? exclude, [FromQuery] PaginationParams qp)
+        public async Task<PaginatedResponse> GetCategories([FromQuery] long? exclude, [FromQuery] PaginationParams qp, [FromQuery] string keyword = "")
         {
             var whereQuery = _context.ProductCategories
                 .Include(x => x.Products)
                 .Include(x => x.ChildCategories)
                 .AsQueryable();
+
+            foreach(var word in keyword.Trim().Split(" "))
+            {
+                whereQuery = whereQuery.Where(x => x.Name.Contains(word));
+            }
 
             if (exclude != null)
             {

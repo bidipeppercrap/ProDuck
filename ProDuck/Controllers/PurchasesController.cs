@@ -23,11 +23,16 @@ namespace ProDuck.Controllers
         }
 
         [HttpGet]
-        public async Task<PaginatedResponse> Get([FromQuery] PaginationParams qp)
+        public async Task<PaginatedResponse> Get([FromQuery] PaginationParams qp, [FromQuery] long? vendorId)
         {
-            var result = await _context.Purchases
+            var whereQuery = _context.Purchases
                 .Include(p => p.Vendor)
                 .Include(p => p.Orders)
+                .AsQueryable();
+
+            if (vendorId != null) whereQuery = whereQuery.Where(x => x.VendorId == vendorId);
+
+            var result = await whereQuery
                 .Select(p => PurchaseToListDTO(p, p.Orders.Sum(o => o.Cost)))
                 .ToPagedListAsync(qp.Page, qp.PageSize);
 
