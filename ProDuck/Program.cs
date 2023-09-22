@@ -8,6 +8,18 @@ var builder = WebApplication.CreateBuilder(args);
 string connectionString = builder.Configuration["Database:ConnectionString"]!;
 var serverVersion = new MariaDbServerVersion(new Version(10, 6, 14));
 
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(
+        policy =>
+        {
+            policy
+            .AllowAnyOrigin()
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+        });
+});
+
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -19,12 +31,7 @@ builder.Services.AddDbContext<ProDuckContext>(opt =>
 
 var app = builder.Build();
 
-app.UseCors(builder =>
-    builder
-    .AllowAnyOrigin()
-    .AllowAnyMethod()
-    .AllowAnyHeader()
-);
+app.UseCors();
 
 app.UseAuthorization();
 
