@@ -7,6 +7,7 @@ using ProDuck.QueryParams;
 using ProDuck.Responses;
 using ProDuck.Types;
 using System.Text.Json.Serialization;
+using static Microsoft.Extensions.Logging.EventSource.LoggingEventSource;
 using static ProDuck.Controllers.ProductsController;
 
 namespace ProDuck.Controllers
@@ -23,13 +24,21 @@ namespace ProDuck.Controllers
         }
 
         [HttpGet("location/{id}")]
-        public async Task<PaginatedResponse> GetProductsInLocation(long id, [FromQuery] PaginationParams qp)
+        public async Task<PaginatedResponse> GetLocationStocks(long id, [FromQuery] PaginationParams qp, [FromQuery] bool isRootLocation = false, [FromQuery] string keyword = "")
         {
-            var result = await _context.Locations
-                .Include(l => l.Products)
-                    .ThenInclude(s => s.Product)
-                .Where(l => l.Id == id)
-                .Select(x => LocationStockListToDTO(x))
+            var whereQuery = _context.StockLocation
+                .Include(x => x.Product)
+                .Where(x => x.Product.Deleted == false)
+                .Where(x => x.LocationId == (isRootLocation ? null : id));
+
+            var words = keyword.Trim().Split(" ");
+            foreach (var word in words)
+            {
+                whereQuery = whereQuery.Where(x => x.Product.Name.Contains(word));
+            }
+
+            var result = await whereQuery
+                .Select(x => ProductStockToDTO(x))
                 .ToPagedListAsync(qp.Page, qp.PageSize);
 
             return new PaginatedResponse(result, new Pagination
@@ -42,13 +51,20 @@ namespace ProDuck.Controllers
         }
 
         [HttpGet("product/{id}")]
-        public async Task<PaginatedResponse> GetLocationsOfProduct(long id, [FromQuery] PaginationParams qp)
+        public async Task<PaginatedResponse> GetProductStocks(long id, [FromQuery] PaginationParams qp, [FromQuery] string keyword = "")
         {
-            var result = await _context.Products
-                .Include(p => p.Stocks)
-                    .ThenInclude(s => s.Location)
-                .Where(p => p.Id == id)
-                .Select(x => ProductStockListToDTO(x))
+            var whereQuery = _context.StockLocation
+                .Include(x => x.Location)
+                .Where(x => x.ProductId == id);
+
+            var words = keyword.Trim().Split(" ");
+            foreach (var word in words)
+            {
+                whereQuery = whereQuery.Where(x => x.Location != null && x.Location.Name.Contains(word));
+            }
+
+            var result = await whereQuery
+                .Select(x => LocationStockToDTO(x))
                 .ToPagedListAsync(qp.Page, qp.PageSize);
 
             return new PaginatedResponse(result, new Pagination
@@ -122,55 +138,35 @@ namespace ProDuck.Controllers
             return result;
         }
 
-        private static ProductStockListDTO ProductStockListToDTO(Product product)
+        private static LocationStockDTO LocationStockToDTO(StockLocation stock)
         {
-            var locations = new List<ProductStockDTO>();
-
-            foreach (var s in product.Stocks)
+            var location = stock.Location != null ? new LocationStockDTOLocation
             {
-                locations.Add(new ProductStockDTO()
-                {
-                    Id = s.Id,
-                    Stock = s.Stock,
-                    Location = s.Location == null ? null : new ProductStockLocationDTO()
-                    {
-                        Id = s.Location.Id,
-                        Name = s.Location.Name
-                    }
-                });
-            }
+                Id = stock.Location.Id,
+                Name = stock.Location.Name,
+            } : null;
 
-            return new ProductStockListDTO()
+            return new LocationStockDTO
             {
-                Id = product.Id,
-                Name = product.Name,
-                Stocks = locations
+                Id = stock.Id,
+                Stock = stock.Stock,
+                Location = location
             };
         }
 
-        private static LocationStockListDTO LocationStockListToDTO(Location location)
+        private static ProductStockDTO ProductStockToDTO(StockLocation stock)
         {
-            var products = new List<LocationStockDTO>();
-
-            foreach (var p in location.Products)
+            var product = new ProductStockDTOProduct
             {
-                products.Add(new LocationStockDTO()
-                {
-                    Id = p.Id,
-                    Stock = p.Stock,
-                    Product = new LocationStockProductDTO()
-                    {
-                        Id = p.Product.Id,
-                        Name = p.Product.Name
-                    }
-                });
-            }
+                Id = stock.Product.Id,
+                Name = stock.Product.Name
+            };
 
-            return new LocationStockListDTO()
+            return new ProductStockDTO
             {
-                Id = location.Id,
-                Name = location.Name,
-                Stocks = products
+                Id = stock.Id,
+                Stock = stock.Stock,
+                Product = product
             };
         }
     }

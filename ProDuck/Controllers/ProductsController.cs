@@ -26,7 +26,7 @@ namespace ProDuck.Controllers
         }
 
         [HttpGet]
-        public async Task<PaginatedResponse> GetProducts([FromQuery] long? categoryId, [FromQuery] PaginationParams qp, [FromQuery] string keyword = "")
+        public async Task<PaginatedResponse> GetProducts([FromQuery] long? categoryId, [FromQuery] long? excludeFromLocationId,[FromQuery] PaginationParams qp, [FromQuery] string keyword = "")
         {
             if (_context.Products == null)
             {
@@ -35,15 +35,19 @@ namespace ProDuck.Controllers
             var category = categoryId != null ? await _context.ProductCategories.FindAsync(categoryId) : null;
             if (category == null && categoryId != null) throw new ApiException("Category not found.");
 
+
             var q = _context.Products
                 .Include(x => x.Category)
                 .Include(_ => _.Stocks)
                 .Where(x => x.Deleted == false)
                 .AsQueryable();
 
+
             if (categoryId != null) q = _context.Products
                 .Where(x => x.Deleted == false)
                 .Where(x => x.Category == category);
+
+            if (excludeFromLocationId != null) q = q.Where(x => x.Stocks.All(s => s.LocationId != excludeFromLocationId));
 
             var keywords = keyword.Trim().Split(" ");
             foreach(var word in keywords)

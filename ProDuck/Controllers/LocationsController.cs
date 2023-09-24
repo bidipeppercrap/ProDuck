@@ -28,7 +28,7 @@ namespace ProDuck.Controllers
             var result = new ValidationResult();
 
             if (dto.Name.Length < 3) result.ErrorMessages.Add("Name must be longer than 2 characters.");
-            if (dto.LocationId == dto.Id) result.ErrorMessages.Add("Parent Location cannot be thy self.");
+            if (dto.LocationId != null && dto.LocationId == dto.Id) result.ErrorMessages.Add("Parent Location cannot be thy self.");
 
             if (result.ErrorMessages.Count > 0) return result;
 
