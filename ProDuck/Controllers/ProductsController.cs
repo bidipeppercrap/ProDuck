@@ -104,7 +104,10 @@ namespace ProDuck.Controllers
         {
             if (productDTO.Name.Length < 3) throw new ApiException("Name must be longer than 2.");
 
-            var product = await _context.Products.FindAsync(id);
+            var product = await _context.Products
+                .Include(x => x.Category)
+                .Where(x => x.Id.Equals(id))
+                .FirstOrDefaultAsync();
 
             if (product == null) throw new ApiException("Product not found.", 404);
 

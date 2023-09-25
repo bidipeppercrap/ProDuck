@@ -58,12 +58,17 @@ namespace ProDuck.Controllers
                 .Where(x => x.ProductId == id);
 
             var words = keyword.Trim().Split(" ");
-            foreach (var word in words)
+            if (keyword.Length > 0)
             {
-                whereQuery = whereQuery.Where(x => x.Location != null && x.Location.Name.Contains(word));
+                foreach (var word in words)
+                {
+                    whereQuery = whereQuery.Where(x => x.Location != null && x.Location.Name.Contains(word));
+                }
             }
 
             var result = await whereQuery
+                .OrderBy(x => x.Location)
+                .ThenBy(x => x.Stock)
                 .Select(x => LocationStockToDTO(x))
                 .ToPagedListAsync(qp.Page, qp.PageSize);
 
@@ -82,14 +87,29 @@ namespace ProDuck.Controllers
             var validation = await ValidateStockCreateAsync(stockDTO);
             if (!validation.IsValid) throw new ApiException(validation.ErrorMessages.First());
 
-            var stock = new StockLocation()
-            {
-                Stock = stockDTO.Stock,
-                ProductId = stockDTO.ProductId,
-                LocationId = stockDTO.LocationId
-            };
+            var stock = await _context.StockLocation
+                .Where(x => x.ProductId.Equals(stockDTO.ProductId))
+                .Where(x => x.LocationId.Equals(stockDTO.LocationId))
+                .FirstOrDefaultAsync();
 
-            _context.StockLocation.Add(stock);
+            if (stock != null)
+            {
+                stock.Stock += stockDTO.Stock;
+
+                _context.StockLocation.Update(stock);
+            }
+            else
+            {
+                stock = new StockLocation()
+                {
+                    Stock = stockDTO.Stock,
+                    ProductId = stockDTO.ProductId,
+                    LocationId = stockDTO.LocationId
+                };
+
+                _context.StockLocation.Add(stock);
+            }
+
             await _context.SaveChangesAsync();
 
             return NoContent();
@@ -129,8 +149,11 @@ namespace ProDuck.Controllers
             var product = await _context.Products.FindAsync(stockCreateDTO.ProductId);
             if (product == null) result.ErrorMessages.Add("Product not found.");
 
-            var location = await _context.Locations.FindAsync(stockCreateDTO.LocationId);
-            if (location == null) result.ErrorMessages.Add("Product not found.");
+            if (stockCreateDTO.LocationId != null)
+            {
+                var location = await _context.Locations.FindAsync(stockCreateDTO.LocationId);
+                if (location == null) result.ErrorMessages.Add("Location not found.");
+            }
 
             if (result.ErrorMessages.Count > 0) return result;
 
