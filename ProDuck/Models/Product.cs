@@ -12,6 +12,7 @@ namespace ProDuck.Models
         public string? Barcode { get; set; }
         public bool Deleted { get; set; } = false;
 
+        public long? CategoryId { get; set; }
         public ProductCategory? Category { get; set; }
 
         public ICollection<StockLocation> Stocks { get; } = new List<StockLocation>();

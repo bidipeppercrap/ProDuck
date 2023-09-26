@@ -147,12 +147,13 @@ namespace ProDuck.Controllers
         }
 
         [HttpGet]
-        public async Task<PaginatedResponse> FetchLocations([FromQuery] long? exclude, [FromQuery] long? parentId, [FromQuery] long? productIdToExclude, [FromQuery] PaginationParams qp, [FromQuery] string keyword = "")
+        public async Task<PaginatedResponse> FetchLocations([FromQuery] long? exclude, [FromQuery] long? parentId, [FromQuery] long? productIdToExclude, [FromQuery] PaginationParams qp, [FromQuery] bool showOnlyRootChilds = false, [FromQuery] string keyword = "")
         {
             var whereQuery = _context.Locations.AsQueryable();
 
             foreach (var word in keyword.Trim().Split(" ")) whereQuery = whereQuery.Where(x => x.Name.Contains(word));
-            if (parentId != null) whereQuery = whereQuery.Where(x => x.LocationId == parentId);
+            if (parentId != null && !showOnlyRootChilds) whereQuery = whereQuery.Where(x => x.LocationId == parentId);
+            if (showOnlyRootChilds) whereQuery = whereQuery.Where(x => x.LocationId == null);
             if (exclude != null) whereQuery = whereQuery.Where(x => x.Id != exclude);
             if (productIdToExclude != null) whereQuery = whereQuery.Where(x => x.Products.All(s => s.ProductId != productIdToExclude));
 

@@ -33,14 +33,15 @@ namespace ProDuck.Controllers
             };
 
         [HttpGet]
-        public async Task<PaginatedResponse> GetCategories([FromQuery] long? exclude, [FromQuery] long? parentId, [FromQuery] PaginationParams qp, [FromQuery] string keyword = "")
+        public async Task<PaginatedResponse> GetCategories([FromQuery] long? exclude, [FromQuery] long? parentId, [FromQuery] PaginationParams qp, [FromQuery] bool showOnlyRootChilds = false, [FromQuery] string keyword = "")
         {
             var whereQuery = _context.ProductCategories
                 .Include(x => x.Products)
                 .Include(x => x.ChildCategories)
                 .AsQueryable();
 
-            if (parentId != null) whereQuery = whereQuery.Where(x => x.ProductCategoryId.Equals(parentId));
+            if (parentId != null && !showOnlyRootChilds) whereQuery = whereQuery.Where(x => x.ProductCategoryId.Equals(parentId));
+            if (showOnlyRootChilds) whereQuery = whereQuery.Where(x => x.ProductCategoryId == null);
 
             foreach(var word in keyword.Trim().Split(" "))
             {
@@ -136,6 +137,12 @@ namespace ProDuck.Controllers
                 .Where(c => c.ParentCategory == category)
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(c => c.ProductCategoryId, category.ProductCategoryId));
+
+            await _context.Products
+                .Include(x => x.Category)
+                .Where(x => x.Category == category)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(p => p.CategoryId, category.ProductCategoryId));
 
             _context.ProductCategories.Remove(category);
             await _context.SaveChangesAsync();

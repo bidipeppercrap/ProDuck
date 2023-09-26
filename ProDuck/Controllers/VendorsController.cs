@@ -49,16 +49,7 @@ namespace ProDuck.Controllers
         {
             var vendor = await _context.Vendors.FindAsync(id) ?? throw new ApiException("Vendor not found.");
 
-            dynamic vendorDTO;
-
-            vendorDTO = new ExpandoObject();
-            vendorDTO.Id = vendor.Id;
-            vendorDTO.Name = vendor.Name;
-            vendorDTO.Description = vendor.Description;
-            vendorDTO.Contact = vendor.Contact;
-            vendorDTO.IsDeleted = vendor.IsDeleted;
-
-            return new PaginatedResponse(vendorDTO);
+            return new PaginatedResponse(VendorToDTO(vendor));
         }
 
         [HttpPost]
