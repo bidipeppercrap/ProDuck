@@ -6,6 +6,7 @@ using ProDuck.Models;
 using ProDuck.QueryParams;
 using ProDuck.Responses;
 using ProDuck.Types;
+using static Microsoft.Extensions.Logging.EventSource.LoggingEventSource;
 
 namespace ProDuck.Controllers
 {
@@ -53,11 +54,17 @@ namespace ProDuck.Controllers
         }
 
         [HttpGet("products/{id}")]
-        public async Task<PaginatedResponse> GetProductPrices([FromQuery] PaginationParams qp, long id)
+        public async Task<PaginatedResponse> GetProductPrices([FromQuery] PaginationParams qp, long id, [FromQuery] string keyword = "")
         {
-            var prices = await _context.CustomerPrice
-                .Where(x => x.ProductId == id)
+            var whereQuery = _context.CustomerPrice
                 .Include(x => x.Customer)
+                .Where(x => x.ProductId == id)
+                .AsQueryable();
+
+            var keywords = keyword.Trim().Split(" ");
+            foreach (var word in keywords) whereQuery = whereQuery.Where(x => x.Customer.Name.Contains(word));
+
+            var prices = await whereQuery
                 .Select(x => PriceToDTO(x))
                 .ToPagedListAsync(qp.Page, qp.PageSize);
 
@@ -65,14 +72,19 @@ namespace ProDuck.Controllers
         }
 
         [HttpGet("customers/{id}")]
-        public async Task<PaginatedResponse> GetCustomerPrices([FromQuery] PaginationParams qp, long id)
+        public async Task<PaginatedResponse> GetCustomerPrices([FromQuery] PaginationParams qp, long id, [FromQuery] string keyword = "")
         {
-            var prices = await _context.CustomerPrice
-                .Where(x => x.CustomerId == id)
+            var whereQuery = _context.CustomerPrice
                 .Include(x => x.Product)
+                .Where(x => x.CustomerId == id)
+                .AsQueryable();
+
+            var keywords = keyword.Trim().Split(" ");
+            foreach (var word in keywords) whereQuery = whereQuery.Where(x => x.Product.Name.Contains(word));
+            
+            var prices = await whereQuery
                 .Select(x => PriceToDTO(x))
                 .ToPagedListAsync(qp.Page, qp.PageSize);
-
 
             return new PaginatedResponse(prices, new Pagination
             {
@@ -91,6 +103,12 @@ namespace ProDuck.Controllers
             var customer = await _context.Customers.FindAsync(priceDTO.CustomerId);
             var product = await _context.Products.FindAsync(priceDTO.ProductId);
             if (customer == null || product == null) throw new ApiException("Customer or Product not found.");
+
+            var duplicates = await _context.CustomerPrice
+                .Where(x => x.CustomerId.Equals(priceDTO.CustomerId))
+                .Where(x => x.ProductId.Equals(priceDTO.ProductId))
+                .FirstOrDefaultAsync();
+            if (duplicates != null) throw new ApiException("Price already exist.");
 
             var price = new CustomerPrice
             {
@@ -117,6 +135,12 @@ namespace ProDuck.Controllers
             var customer = await _context.Customers.FindAsync(priceDTO.CustomerId);
             var product = await _context.Products.FindAsync(priceDTO.ProductId);
             if (customer == null || product == null) throw new ApiException("Customer or Product is invalid.");
+
+            var duplicates = await _context.CustomerPrice
+                .Where(x => x.CustomerId.Equals(priceDTO.CustomerId))
+                .Where(x => x.ProductId.Equals(priceDTO.ProductId))
+                .FirstOrDefaultAsync();
+            if (duplicates != null) throw new ApiException("Price already exist.");
 
             price.Price = priceDTO.Price;
             price.MinQty = priceDTO.MinQty;
