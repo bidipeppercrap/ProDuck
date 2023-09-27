@@ -136,12 +136,6 @@ namespace ProDuck.Controllers
             var product = await _context.Products.FindAsync(priceDTO.ProductId);
             if (customer == null || product == null) throw new ApiException("Customer or Product is invalid.");
 
-            var duplicates = await _context.CustomerPrice
-                .Where(x => x.CustomerId.Equals(priceDTO.CustomerId))
-                .Where(x => x.ProductId.Equals(priceDTO.ProductId))
-                .FirstOrDefaultAsync();
-            if (duplicates != null) throw new ApiException("Price already exist.");
-
             price.Price = priceDTO.Price;
             price.MinQty = priceDTO.MinQty;
             price.CustomerId = (long)priceDTO.CustomerId;

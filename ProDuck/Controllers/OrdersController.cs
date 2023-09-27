@@ -101,6 +101,22 @@ namespace ProDuck.Controllers
             });
         }
 
+        [HttpGet("{id}")]
+        public async Task<PaginatedResponse> GetById(long id)
+        {
+            var order = await _context.Orders
+                .Include(x => x.ServedBy)
+                .Include(x => x.Customer)
+                .Include(x => x.Items)
+                .Where(x => x.Id == id)
+                .Select(x => OrderToDTO(x))
+                .FirstOrDefaultAsync();
+
+            if (order == null) throw new ApiException("Order not found");
+
+            return new PaginatedResponse(order);
+        }
+
         [HttpGet("possessions/{id}")]
         public async Task<PaginatedResponse> GetBySession(long id, [FromQuery] PaginationParams qp, [FromQuery] long? userId, [FromQuery] long? customerId)
         {

@@ -44,7 +44,6 @@ namespace ProDuck.Controllers
 
 
             if (categoryId != null) q = _context.Products
-                .Where(x => x.Deleted == false)
                 .Where(x => x.Category == category);
 
             if (excludeFromLocationId != null) q = q.Where(x => x.Stocks.All(s => s.LocationId != excludeFromLocationId));

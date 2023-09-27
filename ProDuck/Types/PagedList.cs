@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using ProDuck.Models;
 using System.Collections;
 
 namespace ProDuck.Types
