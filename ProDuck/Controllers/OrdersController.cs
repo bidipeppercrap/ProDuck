@@ -1,4 +1,5 @@
 ﻿using AutoWrapper.Wrappers;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ProDuck.DTO;
@@ -12,6 +13,7 @@ namespace ProDuck.Controllers
 {
     [Route("[controller]")]
     [ApiController]
+    [Authorize]
     public class OrdersController : ControllerBase
     {
         private readonly ProDuckContext _context;
@@ -173,6 +175,7 @@ namespace ProDuck.Controllers
         }
 
         [HttpPost("return")]
+        [Authorize(Roles = "root, clerk")]
         public async Task<PaginatedResponse> PostToReturn([FromBody] List<OrderDTOItem> itemsDTO)
         {
             var whereQuery = _context.Orders
@@ -198,6 +201,7 @@ namespace ProDuck.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = "root, clerk")]
         public async Task<IActionResult> Post([FromBody] OrderCreateDTO orderDTO)
         {
             using var transaction = _context.Database.BeginTransaction();

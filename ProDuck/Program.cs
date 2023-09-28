@@ -2,6 +2,9 @@ using Microsoft.EntityFrameworkCore;
 using ProDuck.Models;
 using System.Text.Json.Serialization;
 using AutoWrapper;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,6 +31,17 @@ builder.Services.AddControllers()
 
 builder.Services.AddDbContext<ProDuckContext>(opt =>
     opt.UseMySql(connectionString, serverVersion));
+
+builder.Services.AddAuthentication().AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = false,
+        ValidateAudience = false,
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JwtSettings:SigningKey"]!))
+    };
+});
 
 var app = builder.Build();
 

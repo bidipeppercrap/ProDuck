@@ -1,4 +1,5 @@
 ﻿using AutoWrapper.Wrappers;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ProDuck.DTO;
@@ -11,6 +12,7 @@ namespace ProDuck.Controllers
 {
     [Route("[controller]")]
     [ApiController]
+    [Authorize]
     public class CustomersController : ControllerBase
     {
         private readonly ProDuckContext _context;
@@ -88,6 +90,7 @@ namespace ProDuck.Controllers
         }
 
         [HttpPut("{id}")]
+        [Authorize(Roles = "root")]
         public async Task<IActionResult> Put(long id, [FromBody] CustomerDTO customerDTO)
         {
             var validation = ValidateCustomer(customerDTO);
@@ -108,6 +111,7 @@ namespace ProDuck.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Authorize(Roles = "root")]
         public async Task<IActionResult> Delete(long id)
         {
             var customer = await _context.Customers.FindAsync(id);

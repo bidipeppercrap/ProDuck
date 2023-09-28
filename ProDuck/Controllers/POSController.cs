@@ -1,4 +1,5 @@
 ﻿using AutoWrapper.Wrappers;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ProDuck.DTO;
@@ -11,6 +12,7 @@ namespace ProDuck.Controllers
 {
     [Route("[controller]")]
     [ApiController]
+    [Authorize]
     public class POSController : ControllerBase
     {
         private readonly ProDuckContext _context;
@@ -102,6 +104,7 @@ namespace ProDuck.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = "root")]
         public async Task<IActionResult> Post([FromBody] PointOfSale pos)
         {
             var validation = ValidatePOS(pos);
@@ -114,6 +117,7 @@ namespace ProDuck.Controllers
         }
 
         [HttpPut("{id}")]
+        [Authorize(Roles = "root")]
         public async Task<IActionResult> Put(long id, [FromBody] PointOfSale posDTO)
         {
             var validation = ValidatePOS(posDTO);
@@ -131,6 +135,7 @@ namespace ProDuck.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Authorize(Roles = "root")]
         public async Task<IActionResult> Delete(long id)
         {
             var pos = await _context.PointOfSale.FindAsync(id);

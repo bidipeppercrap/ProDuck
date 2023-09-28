@@ -1,4 +1,5 @@
 ﻿using AutoWrapper.Wrappers;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ProDuck.DTO;
@@ -14,6 +15,7 @@ namespace ProDuck.Controllers
 {
     [Route("[controller]")]
     [ApiController]
+    [Authorize]
     public class StockLocationController : ControllerBase
     {
         private readonly ProDuckContext _context;
@@ -82,6 +84,7 @@ namespace ProDuck.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = "root")]
         public async Task<IActionResult> Post([FromBody] StockCreateDTO stockDTO)
         {
             var validation = await ValidateStockCreateAsync(stockDTO);
@@ -116,6 +119,7 @@ namespace ProDuck.Controllers
         }
 
         [HttpPut("{id}")]
+        [Authorize(Roles = "root")]
         public async Task<ActionResult> Put(long id, [FromBody] StockUpdateDTO updateDTO)
         {
             var stock = await _context.StockLocation.FindAsync(id);
@@ -129,6 +133,7 @@ namespace ProDuck.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Authorize(Roles = "root")]
         public async Task<ActionResult> Delete(long id)
         {
             var stock = await _context.StockLocation.FindAsync(id);

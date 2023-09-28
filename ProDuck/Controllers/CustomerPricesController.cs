@@ -1,4 +1,5 @@
 ﻿using AutoWrapper.Wrappers;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ProDuck.DTO;
@@ -12,6 +13,7 @@ namespace ProDuck.Controllers
 {
     [Route("[controller]")]
     [ApiController]
+    [Authorize]
     public class CustomerPricesController : ControllerBase
     {
         private readonly ProDuckContext _context;
@@ -96,6 +98,7 @@ namespace ProDuck.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = "root")]
         public async Task<IActionResult> Post([FromBody] CustomerPriceDTO priceDTO)
         {
             if (priceDTO.CustomerId == null || priceDTO.ProductId == null) throw new ApiException("Customer and Product is required.");
@@ -125,6 +128,7 @@ namespace ProDuck.Controllers
         }
 
         [HttpPut("{id}")]
+        [Authorize(Roles = "root")]
         public async Task<IActionResult> Put(long id, [FromBody] CustomerPriceDTO priceDTO)
         {
             var price = await _context.CustomerPrice.FindAsync(id);
@@ -147,6 +151,7 @@ namespace ProDuck.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Authorize(Roles = "root")]
         public async Task<IActionResult> Delete(long id)
         {
             var price = await _context.CustomerPrice.FindAsync(id) ?? throw new ApiException("Price not found.");

@@ -1,4 +1,5 @@
 ﻿using AutoWrapper.Wrappers;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ProDuck.DTO;
@@ -11,6 +12,7 @@ namespace ProDuck.Controllers
 {
     [Route("[controller]")]
     [ApiController]
+    [Authorize]
     public class CategoriesController : ControllerBase
     {
 
@@ -78,6 +80,7 @@ namespace ProDuck.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = "root")]
         public async Task<ActionResult<ProductCategoryDTO>> PostCategory(ProductCategoryDTO categoryDTO)
         {
             if (categoryDTO.Name == null) throw new ApiException("Category Name is required.");
@@ -103,6 +106,7 @@ namespace ProDuck.Controllers
         }
 
         [HttpPut("{id}")]
+        [Authorize(Roles = "root")]
         public async Task<IActionResult> PutCategory(long id, ProductCategoryDTO categoryDTO)
         {
             var category = await _context.ProductCategories.FindAsync(id);
@@ -127,6 +131,7 @@ namespace ProDuck.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Authorize(Roles = "root")]
         public async Task<IActionResult> DeleteCategory(long id)
         {
             using var transaction = _context.Database.BeginTransaction();

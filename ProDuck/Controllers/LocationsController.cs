@@ -1,4 +1,5 @@
 ﻿using AutoWrapper.Wrappers;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -14,6 +15,7 @@ namespace ProDuck.Controllers
 {
     [Route("[controller]")]
     [ApiController]
+    [Authorize]
     public class LocationsController : ControllerBase
     {
         private readonly ProDuckContext _context;
@@ -60,6 +62,7 @@ namespace ProDuck.Controllers
         }
 
         [HttpPut("{id}")]
+        [Authorize(Roles = "root")]
         public async Task<IActionResult> UpdateLocation(long id, [FromBody] LocationDTO dto)
         {
             dto.Id = id;
@@ -81,6 +84,7 @@ namespace ProDuck.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Authorize(Roles = "root")]
         public async Task<ActionResult> DeleteLocation(long id)
         {
             using var transaction = _context.Database.BeginTransaction();
@@ -171,6 +175,7 @@ namespace ProDuck.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = "root")]
         public async Task<ActionResult<LocationDTO>> PostLocation(LocationDTO locationDTO)
         {
             var validation = ValidateLocationDTO(locationDTO);

@@ -1,4 +1,5 @@
 ﻿using AutoWrapper.Wrappers;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ProDuck.DTO;
@@ -12,6 +13,7 @@ namespace ProDuck.Controllers
 {
     [Route("[controller]")]
     [ApiController]
+    [Authorize]
     public class POSSessionsController : ControllerBase
     {
         private readonly ProDuckContext _context;
@@ -99,6 +101,7 @@ namespace ProDuck.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = "root, clerk")]
         public async Task<IActionResult> Post([FromBody] POSSessionDTO sessionDTO)
         {
             if (await IsPOSActive(sessionDTO.POSId)) throw new ApiException("POS is already has an active session.");
@@ -118,6 +121,7 @@ namespace ProDuck.Controllers
         }
 
         [HttpPut("close/{id}")]
+        [Authorize(Roles = "root, clerk")]
         public async Task<IActionResult> CloseSession(long id, [FromBody] POSSessionDTO sessionDTO)
         {
             var session = await _context.POSSession.FindAsync(id);
@@ -135,6 +139,7 @@ namespace ProDuck.Controllers
         }
 
         [HttpPut("{id}")]
+        [Authorize(Roles = "root")]
         public async Task<IActionResult> Put(long id, [FromBody] POSSessionDTO sessionDTO)
         {
             var session = await _context.POSSession.FindAsync(id);

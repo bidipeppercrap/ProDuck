@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using AutoWrapper.Wrappers;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -26,6 +27,7 @@ namespace ProDuck.Controllers
         }
 
         [HttpGet]
+        [Authorize]
         public async Task<PaginatedResponse> GetProducts([FromQuery] long? categoryId, [FromQuery] long? excludeFromLocationId,[FromQuery] PaginationParams qp, [FromQuery] string keyword = "")
         {
             if (_context.Products == null)
@@ -79,6 +81,7 @@ namespace ProDuck.Controllers
         }
 
         [HttpGet("{id}")]
+        [Authorize]
         public async Task<PaginatedResponse> GetProduct(long id)
         {
           if (_context.Products == null)
@@ -99,6 +102,7 @@ namespace ProDuck.Controllers
         }
 
         [HttpPut("{id}")]
+        [Authorize(Roles = "root")]
         public async Task<IActionResult> PutProduct(long id, ProductDTO productDTO)
         {
             if (productDTO.Name.Length < 3) throw new ApiException("Name must be longer than 2.");
@@ -139,6 +143,7 @@ namespace ProDuck.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = "root")]
         public async Task<ActionResult<ProductDTO>> PostProduct(ProductDTO productDTO)
         {
             if (productDTO.Name.Length < 3) throw new ApiException("Name must be longer than 2.");
@@ -182,6 +187,7 @@ namespace ProDuck.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Authorize(Roles = "root")]
         public async Task<IActionResult> DeleteProduct(long id)
         {
             if (_context.Products == null)
