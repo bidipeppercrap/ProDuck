@@ -26,6 +26,17 @@ namespace ProDuck.Controllers
             _context = context;
         }
 
+        [HttpGet("all")]
+        [Authorize(Roles = "root, clerk")]
+        public async Task<ActionResult<IEnumerable<Product>>> GetAllProducts()
+        {
+            var products = await _context.Products
+                .Where(x => x.Deleted == false)
+                .ToListAsync();
+
+            return Ok(products);
+        }
+
         [HttpGet]
         [Authorize]
         public async Task<PaginatedResponse> GetProducts([FromQuery] long? categoryId, [FromQuery] long? excludeFromLocationId,[FromQuery] PaginationParams qp, [FromQuery] string keyword = "")

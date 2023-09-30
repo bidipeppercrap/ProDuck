@@ -70,7 +70,7 @@ namespace ProDuck.Controllers
         public async Task<PaginatedResponse> Get([FromQuery] PaginationParams qp, [FromQuery] long? userId, [FromQuery] string keyword = "")
         {
             var whereQuery = _context.PointOfSale
-                .Include(x => x.Sessions.Where(s => s.ClosedAt == null))
+                .Include(x => x.Sessions)
                 .Where(x => x.IsDeleted == false)
                 .Where(x => x.Name.Contains(keyword))
                 .AsQueryable();
@@ -94,7 +94,7 @@ namespace ProDuck.Controllers
         public async Task<PaginatedResponse> Get(long id)
         {
             var pos = await _context.PointOfSale
-                .Include(x => x.Sessions.Where(s => s.ClosedAt == null))
+                .Include(x => x.Sessions)
                 .Include(x => x.AssignedUsers.Where(u => u.IsDeleted == false))
                 .Where(x => x.Id == id)
                 .Select(x => POSToDTO(x))

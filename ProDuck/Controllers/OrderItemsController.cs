@@ -21,6 +21,18 @@ namespace ProDuck.Controllers
             _context = context;
         }
 
+        [HttpGet("orders/all/{id}")]
+        public async Task<PaginatedResponse> GetAllByOrder(long id)
+        {
+            var orderItems = await _context.OrdersItem
+                .Include(x => x.Product)
+                .Where(x => x.OrderId.Equals(id))
+                .Select(x => OrderItemToDTO(x))
+                .ToListAsync();
+
+            return new PaginatedResponse(orderItems);
+        }
+
         [HttpGet("orders/{id}")]
         public async Task<PaginatedResponse> GetByOrder(long id, [FromQuery] PaginationParams qp, [FromQuery] string keyword = "")
         {

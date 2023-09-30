@@ -57,8 +57,11 @@ namespace ProDuck.Controllers
         {
             List<Claim> claims = new()
             {
-                new Claim(ClaimTypes.Name, user.Username)
+                new Claim(JwtRegisteredClaimNames.Jti, user.Id.ToString()!),
+                new Claim(JwtRegisteredClaimNames.Sub, user.Username)
             };
+
+            if (user.Name != null) claims.Add(new Claim(JwtRegisteredClaimNames.Name, user.Name));
 
             foreach (var role in roles)
             {

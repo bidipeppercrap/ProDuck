@@ -97,6 +97,16 @@ namespace ProDuck.Controllers
             });
         }
 
+        [HttpGet("customers/all/{id}")]
+        public async Task<ActionResult<IEnumerable<CustomerPrice>>> GetAllCustomerPrices(long id)
+        {
+            var prices = await _context.CustomerPrice
+                .Where(x => x.CustomerId.Equals(id))
+                .ToListAsync();
+
+            return Ok(prices);
+        }
+
         [HttpPost]
         [Authorize(Roles = "root")]
         public async Task<IActionResult> Post([FromBody] CustomerPriceDTO priceDTO)
