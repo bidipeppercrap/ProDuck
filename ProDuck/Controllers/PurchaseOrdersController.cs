@@ -51,7 +51,7 @@ namespace ProDuck.Controllers
             var orders = await _context.PurchaseOrders
                 .Include(x => x.Product)
                 .Include(x => x.LandedCostItems).ThenInclude(xx => xx.LandedCost)
-                .Include(x => x.LandedCostItems).ThenInclude(xx => xx.Parent).ThenInclude(xxx => xxx.LandedCost)
+                .Include(x => x.LandedCostItems).ThenInclude(xx => xx.Parent).ThenInclude(xxx => xxx!.LandedCost)
                 .Where(x => x.PurchaseId.Equals(id))
                 .Select(x => OrderToDTO(x))
                 .ToPagedListAsync(qp.Page, qp.PageSize);
