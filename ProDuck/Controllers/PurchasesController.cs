@@ -25,14 +25,16 @@ namespace ProDuck.Controllers
         }
 
         [HttpGet]
-        public async Task<PaginatedResponse> Get([FromQuery] PaginationParams qp, [FromQuery] long? vendorId)
+        public async Task<PaginatedResponse> Get([FromQuery] PaginationParams qp, [FromQuery] long? vendorId, [FromQuery] bool showNotDelivered = false)
         {
             var whereQuery = _context.Purchases
                 .Include(p => p.Vendor)
-                .Include(p => p.Orders)
+                .Include(p => p.Orders).ThenInclude(xx => xx.LandedCostItems).ThenInclude(xxx => xxx.LandedCost)
+                .Include(p => p.Orders).ThenInclude(xx => xx.LandedCostItems).ThenInclude(xxx => xxx.Parent).ThenInclude(xxxx => xxxx!.LandedCost)
                 .AsQueryable();
 
             if (vendorId != null) whereQuery = whereQuery.Where(x => x.VendorId == vendorId);
+            if (showNotDelivered) whereQuery = whereQuery.Where(x => x.Orders.Sum(o => o.Quantity) != 0 && x.Orders.All(x => x.Quantity > x.LandedCostItems.Where(xx => (xx.LandedCost != null && xx.LandedCost.IsDelivered && xx.LandedCost.IsPurchase) || (xx.LandedCost == null && xx.LandedCostItemId != null && xx.Parent!.LandedCost!.IsDelivered && xx.Parent!.LandedCost!.IsPurchase)).Sum(xx => xx.Qty)));
 
             var result = await whereQuery
                 .OrderByDescending(x => x.Date)
@@ -161,7 +163,8 @@ namespace ProDuck.Controllers
                     Id = purchase.Vendor.Id,
                     Name = purchase.Vendor.Name
                 },
-                TotalCost = purchase.Orders.Sum(o => o.Cost * o.Quantity)
+                TotalCost = purchase.Orders.Sum(o => o.Cost * o.Quantity),
+                AllDelivered = purchase.Orders.All(x => x.Quantity <= x.LandedCostItems.Where(xx => (xx.LandedCost != null && xx.LandedCost.IsDelivered && xx.LandedCost.IsPurchase) || (xx.LandedCost == null && xx.LandedCostItemId != null && xx.Parent!.LandedCost!.IsDelivered && xx.Parent!.LandedCost!.IsPurchase)).Sum(xx => xx.Qty))
             };
 
             return dto;

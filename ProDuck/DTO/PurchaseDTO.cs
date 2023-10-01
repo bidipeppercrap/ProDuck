@@ -11,6 +11,7 @@ namespace ProDuck.DTO
         public string Memo { get; set; } = string.Empty;
 
         public decimal TotalCost { get; set; }
+        public bool AllDelivered { get; set; }
 
         public VendorDTO? Vendor { get; set; }
     }
