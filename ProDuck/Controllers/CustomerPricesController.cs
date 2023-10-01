@@ -67,6 +67,7 @@ namespace ProDuck.Controllers
             foreach (var word in keywords) whereQuery = whereQuery.Where(x => x.Customer.Name.Contains(word));
 
             var prices = await whereQuery
+                .OrderByDescending(x => x.Id)
                 .Select(x => PriceToDTO(x))
                 .ToPagedListAsync(qp.Page, qp.PageSize);
 
@@ -85,6 +86,7 @@ namespace ProDuck.Controllers
             foreach (var word in keywords) whereQuery = whereQuery.Where(x => x.Product.Name.Contains(word));
             
             var prices = await whereQuery
+                .OrderByDescending(x => x.Id)
                 .Select(x => PriceToDTO(x))
                 .ToPagedListAsync(qp.Page, qp.PageSize);
 

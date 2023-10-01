@@ -78,6 +78,7 @@ namespace ProDuck.Controllers
             if (userId != null) whereQuery = whereQuery.Where(x => x.AssignedUsers.Any(u => u.Id == userId));
 
             var result = await whereQuery
+                .OrderByDescending(x => x.Id)
                 .Select(x => POSToDTO(x))
                 .ToPagedListAsync(qp.Page, qp.PageSize);
 

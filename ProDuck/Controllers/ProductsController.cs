@@ -70,6 +70,7 @@ namespace ProDuck.Controllers
             try
             {
                 var products = await q
+                    .OrderByDescending(x => x.Id)
                     .Select(x => ProductToDTO(x))
                     .ToPagedListAsync(qp.Page, qp.PageSize);
 

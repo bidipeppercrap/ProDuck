@@ -10,11 +10,8 @@ namespace ProDuck.DTO
         public string SourceDocument { get; set; } = string.Empty;
         public string Memo { get; set; } = string.Empty;
 
-        public VendorDTO? Vendor { get; set; }
-        public ICollection<PurchaseOrderDTO>? Orders { get; set; }
-        public ICollection<long>? DeletedOrders { get; set; }
+        public decimal TotalCost { get; set; }
 
-        // Temporary Delivered Field
-        public bool IsDelivered = false;
+        public VendorDTO? Vendor { get; set; }
     }
 }

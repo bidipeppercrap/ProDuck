@@ -35,7 +35,8 @@ namespace ProDuck.Controllers
             if (vendorId != null) whereQuery = whereQuery.Where(x => x.VendorId == vendorId);
 
             var result = await whereQuery
-                .Select(p => PurchaseToListDTO(p, p.Orders.Sum(o => o.Cost)))
+                .OrderByDescending(x => x.Date)
+                .Select(p => PurchaseToDTO(p))
                 .ToPagedListAsync(qp.Page, qp.PageSize);
 
             return new PaginatedResponse(result, new Pagination
@@ -52,33 +53,18 @@ namespace ProDuck.Controllers
         {
             var purchase = await _context.Purchases
                 .Include(p => p.Orders)
-                    .ThenInclude(o => o.Product)
                 .Include(p => p.Vendor)
-                .Where(p =>  p.Id == id)
+                .Where(p =>  p.Id.Equals(id))
                 .Select(p => PurchaseToDTO(p))
-                .FirstOrDefaultAsync();
+                .FirstOrDefaultAsync()
+                ?? throw new ApiException("Purchase not found.");
 
-            if (purchase == null) throw new ApiException("Purchase not found.");
-
-            dynamic dto;
-
-            dto = new ExpandoObject();
-            dto.Id = purchase!.Id;
-            dto.Date = purchase!.Date;
-            dto.SourceDocument = purchase.SourceDocument;
-            dto.Memo = purchase.Memo;
-            dto.Vendor = purchase.Vendor;
-            dto.Orders = purchase.Orders;
-            dto.IsDelivered = purchase.IsDelivered;
-
-            return new PaginatedResponse(dto);
+            return new PaginatedResponse(purchase);
         }
 
         [HttpPost]
         public async Task<IActionResult> Post([FromBody] PurchaseDTO payload)
         {
-            using var transaction = _context.Database.BeginTransaction();
-
             var validation = await ValidatePurchaseAsync(payload);
             if (!validation.IsValid) throw new ApiException(validation.ErrorMessages.First());
 
@@ -88,42 +74,10 @@ namespace ProDuck.Controllers
                 VendorId = payload.VendorId,
                 SourceDocument = payload.SourceDocument,
                 Memo = payload.Memo,
-                IsDelivered = payload.IsDelivered,
             };
 
-            try
-            {
-                _context.Purchases.Add(purchase);
-                await _context.SaveChangesAsync();
-
-                if (payload.Orders != null)
-                {
-                    if (payload.Orders!.Count > 0)
-                    {
-                        foreach (var order in payload.Orders)
-                        {
-                            var po = new PurchaseOrder
-                            {
-                                PurchaseId = (long)purchase.Id!,
-                                ProductId = order.ProductId,
-                                Cost = order.Cost,
-                                Quantity = order.Quantity,
-                            };
-
-                            _context.PurchaseOrders.Add(po);
-                        }
-
-                        await _context.SaveChangesAsync();
-                    }
-                }
-
-                await transaction.CommitAsync();
-            }
-            catch (Exception ex)
-            {
-                if (ex.InnerException != null) throw new ApiException(ex.InnerException.Message);
-                throw new ApiException(ex.Message);
-            }
+            _context.Purchases.Add(purchase);
+            await _context.SaveChangesAsync();
 
             return NoContent();
         }
@@ -134,15 +88,7 @@ namespace ProDuck.Controllers
             var validation = await ValidatePurchaseAsync(dto);
             if (!validation.IsValid) throw new ApiException(validation.ErrorMessages.First());
 
-            var transaction = _context.Database.BeginTransaction();
-
-            var purchase = await _context.Purchases.FindAsync(id);
-            if (purchase == null) throw new ApiException("Purchase not found.");
-
-            purchase.Date = dto.Date;
-            purchase.VendorId = dto.VendorId;
-            purchase.SourceDocument = dto.SourceDocument;
-            purchase.Memo = dto.Memo;
+            var purchase = await _context.Purchases.FindAsync(id) ?? throw new ApiException("Purchase not found.");
 
             await _context.Purchases
                 .Where(p => p.Id == id)
@@ -151,52 +97,6 @@ namespace ProDuck.Controllers
                     .SetProperty(p => p.VendorId, dto.VendorId)
                     .SetProperty(p => p.SourceDocument, dto.SourceDocument)
                     .SetProperty(p => p.Memo, dto.Memo));
-
-            var newOrders = new List<PurchaseOrderDTO>();
-            var submittedOrders = new List<PurchaseOrderDTO>();
-
-            if (dto.Orders != null)
-            {
-                newOrders = dto.Orders.Where(o => o.Id == null).ToList();
-                submittedOrders = dto.Orders.Where(o => o.Id != null).ToList();
-            }
-
-            foreach(var o in newOrders)
-            {
-                var po = new PurchaseOrder
-                {
-                    PurchaseId = (long)purchase.Id!,
-                    ProductId = o.ProductId,
-                    Cost = o.Cost,
-                    Quantity = o.Quantity,
-                };
-
-                _context.PurchaseOrders.Add(po);
-            }
-
-            foreach(var o in submittedOrders)
-            {
-                await _context.PurchaseOrders
-                    .Where(x => x.Id == o.Id)
-                    .ExecuteUpdateAsync(s => s
-                        .SetProperty(x => x.ProductId, o.ProductId)
-                        .SetProperty(x => x.Quantity, o.Quantity)
-                        .SetProperty(x => x.Cost, o.Cost));
-            }
-
-            if (dto.DeletedOrders != null)
-            {
-                foreach(long o in dto.DeletedOrders)
-                {
-                    var order = await _context.PurchaseOrders.FindAsync(o);
-
-                    if (order != null) _context.PurchaseOrders.Remove(order);
-                }
-            }
-
-            await _context.SaveChangesAsync();
-
-            await _context.Database.CommitTransactionAsync();
 
             return NoContent();
         }
@@ -243,41 +143,26 @@ namespace ProDuck.Controllers
             dto.SourceDocument = purchase.SourceDocument;
             dto.Vendor = purchase.Vendor.Name;
             dto.TotalCost = totalCost;
-            dto.IsDelivered = purchase.IsDelivered;
 
             return dto;
         }
 
-        private static dynamic PurchaseToDTO(Purchase purchase)
+        private static PurchaseDTO PurchaseToDTO(Purchase purchase)
         {
-            var orders = new List<dynamic>();
-            dynamic vendor = new ExpandoObject();
-
-            vendor.Id = purchase.Vendor.Id;
-            vendor.Name = purchase.Vendor.Name;
-
-            foreach (var order in purchase.Orders)
+            var dto = new PurchaseDTO
             {
-                dynamic o = new ExpandoObject();
-
-                o.Id = order.Id;
-                o.Product = order.Product;
-                o.Quantity = order.Quantity;
-                o.Cost = order.Cost;
-
-                orders.Add(o);
-            }
-
-            dynamic dto = new ExpandoObject();
-
-            dto.Id = purchase.Id;
-            dto.VendorId = purchase.VendorId;
-            dto.Date = purchase.Date;
-            dto.SourceDocument = purchase.SourceDocument;
-            dto.Memo = purchase.Memo;
-            dto.Vendor = vendor;
-            dto.Orders = orders;
-            dto.IsDelivered = purchase.IsDelivered;
+                Id = purchase.Id,
+                VendorId = purchase.VendorId,
+                Date = purchase.Date,
+                SourceDocument = purchase.SourceDocument,
+                Memo = purchase.Memo,
+                Vendor = new VendorDTO
+                {
+                    Id = purchase.Vendor.Id,
+                    Name = purchase.Vendor.Name
+                },
+                TotalCost = purchase.Orders.Sum(o => o.Cost * o.Quantity)
+            };
 
             return dto;
         }

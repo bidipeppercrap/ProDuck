@@ -8,9 +8,6 @@
         public string SourceDocument { get; set; } = string.Empty;
         public string Memo { get; set; } = string.Empty;
 
-        // Temporary Delivered Field
-        public bool IsDelivered = false;
-
         public Vendor Vendor { get; set; } = null!;
         public ICollection<PurchaseOrder> Orders { get; } = new List<PurchaseOrder>();
     }

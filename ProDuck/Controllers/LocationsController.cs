@@ -162,6 +162,7 @@ namespace ProDuck.Controllers
             if (productIdToExclude != null) whereQuery = whereQuery.Where(x => x.Products.All(s => s.ProductId != productIdToExclude));
 
             var result = await whereQuery
+                .OrderByDescending(x => x.Id)
                 .Select(x => LocationToDTO(x))
                 .ToPagedListAsync(qp.Page, qp.PageSize);
 

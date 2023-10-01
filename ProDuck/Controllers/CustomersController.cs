@@ -43,6 +43,7 @@ namespace ProDuck.Controllers
                     .ThenInclude(pp => pp.Product)
                 .Where(x => x.Name.ToLower().Contains(keyword.ToLower()))
                 .Where(x => x.IsDeleted == false)
+                .OrderByDescending(x => x.Id)
                 .Select(x => CustomerToDTO(x))
                 .ToPagedListAsync(qp.Page, qp.PageSize);
 

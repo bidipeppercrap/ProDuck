@@ -91,6 +91,7 @@ namespace ProDuck.Controllers
             if (customerId != null) whereQuery = whereQuery.Where(x => x.CustomerId == customerId);
 
             var orders = await whereQuery
+                .OrderByDescending(x => x.CreatedAt)
                 .Select(x => OrderToDTO(x))
                 .ToPagedListAsync(qp.Page, qp.PageSize);
 
@@ -134,6 +135,7 @@ namespace ProDuck.Controllers
 
             var orders = await whereQuery
                 .Where(_ => _.POSSessionId == id)
+                .OrderByDescending(x => x.CreatedAt)
                 .Select(_ => OrderToDTO(_))
                 .ToPagedListAsync(qp.Page, qp.PageSize);
 
@@ -162,6 +164,7 @@ namespace ProDuck.Controllers
 
             var orders = await whereQuery
                 .Where(_ => _.POSSession.POSId == id)
+                .OrderByDescending(x => x.CreatedAt)
                 .Select(_ => OrderToDTO(_))
                 .ToPagedListAsync(qp.Page, qp.PageSize);
 

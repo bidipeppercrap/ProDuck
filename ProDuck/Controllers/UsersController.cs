@@ -72,6 +72,7 @@ namespace ProDuck.Controllers
 
             var result = await whereQuery
                 .Where(x => x.IsDeleted == false)
+                .OrderByDescending(x => x.Id)
                 .Select(x => UserToDTO(x))
                 .ToPagedListAsync(qp.Page, qp.PageSize);
 

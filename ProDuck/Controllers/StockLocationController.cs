@@ -40,6 +40,7 @@ namespace ProDuck.Controllers
             }
 
             var result = await whereQuery
+                .OrderByDescending(x => x.Id)
                 .Select(x => ProductStockToDTO(x))
                 .ToPagedListAsync(qp.Page, qp.PageSize);
 

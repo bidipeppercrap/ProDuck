@@ -34,6 +34,7 @@ namespace ProDuck.Controllers
             foreach(var word in keyword.Trim().Split(" ")) whereQuery = whereQuery.Where(x => x.Name.Contains(word));
 
             var result = await whereQuery
+                .OrderByDescending(x => x.Id)
                 .Select(v => VendorToDTO(v))
                 .ToPagedListAsync(qp.Page, qp.PageSize);
 

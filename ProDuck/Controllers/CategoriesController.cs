@@ -54,6 +54,7 @@ namespace ProDuck.Controllers
             {
                 var data = await whereQuery
                     .Where(x => x.Id != exclude)
+                    .OrderByDescending(x => x.Id)
                     .Select(x => CategoryToDTO(x))
                     .ToPagedListAsync(qp.Page, qp.PageSize);
 
@@ -61,6 +62,7 @@ namespace ProDuck.Controllers
             }
 
             var result = await whereQuery
+                .OrderByDescending(x => x.Id)
                 .Select(x => CategoryToDTO(x))
                 .ToPagedListAsync(qp.Page, qp.PageSize);
 

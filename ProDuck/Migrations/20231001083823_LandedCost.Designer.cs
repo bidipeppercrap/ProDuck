@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ProDuck.Models;
 
@@ -10,9 +11,11 @@ using ProDuck.Models;
 namespace ProDuck.Migrations
 {
     [DbContext(typeof(ProDuckContext))]
-    partial class ProDuckContextModelSnapshot : ModelSnapshot
+    [Migration("20231001083823_LandedCost")]
+    partial class LandedCost
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -133,20 +136,7 @@ namespace ProDuck.Migrations
                     b.Property<bool>("IsDelivered")
                         .HasColumnType("tinyint(1)");
 
-                    b.Property<bool>("IsPurchase")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<long?>("SourceLocationId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("TargetLocationId")
-                        .HasColumnType("bigint");
-
                     b.HasKey("Id");
-
-                    b.HasIndex("SourceLocationId");
-
-                    b.HasIndex("TargetLocationId");
 
                     b.ToTable("LandedCosts");
                 });
@@ -560,21 +550,6 @@ namespace ProDuck.Migrations
                     b.Navigation("Customer");
 
                     b.Navigation("Product");
-                });
-
-            modelBuilder.Entity("ProDuck.Models.LandedCost", b =>
-                {
-                    b.HasOne("ProDuck.Models.Location", "SourceLocation")
-                        .WithMany()
-                        .HasForeignKey("SourceLocationId");
-
-                    b.HasOne("ProDuck.Models.Location", "TargetLocation")
-                        .WithMany()
-                        .HasForeignKey("TargetLocationId");
-
-                    b.Navigation("SourceLocation");
-
-                    b.Navigation("TargetLocation");
                 });
 
             modelBuilder.Entity("ProDuck.Models.LandedCostItem", b =>
