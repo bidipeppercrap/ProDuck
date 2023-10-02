@@ -4,6 +4,7 @@
     {
         public long Id { get; set; }
         public DateOnly Date { get; set; }
+        public DateOnly? DeliveredAt { get; set; } = null;
         public string Biller { get; set; } = string.Empty;
         public bool IsDelivered { get; set; } = false;
         public bool IsPurchase { get; set; } = true;

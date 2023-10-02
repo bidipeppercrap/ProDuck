@@ -1,4 +1,5 @@
 ﻿using AutoWrapper.Wrappers;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ProDuck.DTO;
@@ -11,6 +12,7 @@ namespace ProDuck.Controllers
 {
     [Route("[controller]")]
     [ApiController]
+    [Authorize(Roles = "root")]
     public class LandedCostsController : ControllerBase
     {
         private readonly ProDuckContext _context;
@@ -96,6 +98,11 @@ namespace ProDuck.Controllers
                 .Include(x => x.Items).ThenInclude(xx => xx.Children)
                 .Where(x => x.Id.Equals(id))
                 .FirstOrDefaultAsync() ?? throw new ApiException("Landed Cost not found.");
+
+                landedCost.DeliveredAt = DateOnly.FromDateTime(DateTime.Now);
+                landedCost.IsDelivered = true;
+
+                await _context.SaveChangesAsync();
 
                 // Update Stock to Source / Target Location
                 foreach (var item in landedCost.Items)
@@ -192,11 +199,38 @@ namespace ProDuck.Controllers
                         }
                     }
 
-                // Update Cost + Previous Landed Cost of Purchase Order
+                var products = await _context.Products
+                    .Where(x => x.PurchaseOrders
+                        .Any(po => po.LandedCostItems
+                            .Any(lci => (lci.LandedCostId == id && lci.LandedCost != null && lci.LandedCost.IsDelivered) || (lci.Parent != null && lci.Parent!.LandedCostId == id && lci.Parent!.LandedCost!.IsDelivered))
+                            &&
+                            x.Cost
+                            <
+                            po.Cost
+                            + po.LandedCostItems.Where(lci2 => lci2.LandedCost != null && lci2.LandedCost.IsDelivered).Sum(lci2 => lci2.Cost / lci2.Qty * (lci2.Qty / po.Quantity))
+                            + po.LandedCostItems.Where(lci2 => lci2.Parent != null && lci2.Parent!.LandedCost!.IsDelivered).Sum(lci2 => (((lci2.Parent!.Children.Sum(child => po.Cost * child.Qty) / (po.Cost * lci2.Qty)) * lci2.Parent.Cost) / lci2.Qty) * (lci2.Qty / po.Quantity))
 
-                // Update Price if bigger than previous
+                        )
+                    )
+                    .ToListAsync();
 
-                landedCost.IsDelivered = true;
+                foreach (var p in products)
+                {
+                    var sumQuery = _context.PurchaseOrders
+                        .Where(x => x.LandedCostItems
+                            .Any(lci => (lci.LandedCostId == id && lci.LandedCost != null && lci.LandedCost.IsDelivered) || (lci.Parent != null && lci.Parent!.LandedCostId == id && lci.Parent!.LandedCost!.IsDelivered))).AsQueryable();
+
+                    var sum = await sumQuery
+                        .Select(po => po.Cost
+                            + po.LandedCostItems.Where(lci2 => lci2.LandedCost != null && lci2.LandedCost.IsDelivered).Sum(lci2 => lci2.Cost / lci2.Qty * (lci2.Qty / po.Quantity)
+                            + po.LandedCostItems.Where(lci2 => lci2.Parent != null && lci2.Parent!.LandedCost!.IsDelivered).Sum(lci2 => (((lci2.Parent!.Children.Sum(child => po.Cost * child.Qty) / (po.Cost * lci2.Qty)) * lci2.Parent.Cost) / lci2.Qty) * (lci2.Qty / po.Quantity))))
+                        .FirstOrDefaultAsync();
+
+                    p.Cost = sum;
+
+                    _context.Products.Update(p);
+                }
+                
                 await _context.SaveChangesAsync();
 
                 await transaction.CommitAsync();

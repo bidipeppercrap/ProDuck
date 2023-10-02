@@ -8,6 +8,7 @@
     public class LandedCostBaseDTO
     {
         public DateOnly Date { get; set; }
+        public DateOnly? DeliveredAt { get; set; }
         public string Biller { get; set; } = string.Empty;
         public long? SourceLocationId { get; set; }
         public long? TargetLocationId { get; set; }

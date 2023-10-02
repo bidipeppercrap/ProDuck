@@ -15,6 +15,7 @@ namespace ProDuck.Models
         public long? CategoryId { get; set; }
         public ProductCategory? Category { get; set; }
 
+        public ICollection<PurchaseOrder> PurchaseOrders { get; } = new List<PurchaseOrder>();
         public ICollection<StockLocation> Stocks { get; } = new List<StockLocation>();
         public ICollection<CustomerPrice> CustomerPrices { get; } = new List<CustomerPrice>();
         public ICollection<OrderItem> OrderItems { get; } = new List<OrderItem>();

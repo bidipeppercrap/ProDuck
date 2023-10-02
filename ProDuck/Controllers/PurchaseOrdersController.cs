@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ProDuck.DTO;
 using ProDuck.Models;
@@ -10,6 +11,7 @@ namespace ProDuck.Controllers
 {
     [Route("[controller]")]
     [ApiController]
+    [Authorize(Roles = "root")]
     public class PurchaseOrdersController : ControllerBase
     {
         private readonly ProDuckContext _context;
