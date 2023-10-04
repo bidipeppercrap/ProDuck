@@ -92,6 +92,25 @@ namespace ProDuck.Controllers
             }
         }
 
+        [HttpGet("negativeprice")]
+        [Authorize]
+        public async Task<PaginatedResponse> GetNegativePriceProducts([FromQuery] PaginationParams qp)
+        {
+            var products = await _context.Products
+                .Where(x => x.Deleted == false)
+                .Where(x => x.Price < x.Cost)
+                .Select(x => ProductToDTO(x))
+                .ToPagedListAsync(qp.Page, qp.PageSize);
+
+            return new PaginatedResponse(products, new Pagination
+            {
+                Count = products.Count,
+                Page = qp.Page,
+                PageSize = qp.PageSize,
+                TotalPages = products.TotalPages
+            });
+        }
+
         [HttpGet("{id}")]
         [Authorize]
         public async Task<PaginatedResponse> GetProduct(long id)

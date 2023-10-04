@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ProDuck.Models;
 
@@ -10,9 +11,11 @@ using ProDuck.Models;
 namespace ProDuck.Migrations
 {
     [DbContext(typeof(ProDuckContext))]
-    partial class ProDuckContextModelSnapshot : ModelSnapshot
+    [Migration("20231003090524_ParentLandedCostItem")]
+    partial class ParentLandedCostItem
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -368,9 +371,6 @@ namespace ProDuck.Migrations
 
                     b.Property<string>("Description")
                         .HasColumnType("longtext");
-
-                    b.Property<int>("MinQty")
-                        .HasColumnType("int");
 
                     b.Property<string>("Name")
                         .IsRequired()

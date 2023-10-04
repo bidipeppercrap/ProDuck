@@ -5,6 +5,7 @@
         public long Id { get; set; }
         public string Name { get; set; } = null!;
         public string? Description { get; set; }
+        public int MinQty { get; set; }
 
         public long? ProductCategoryId { get; set; }
         public ProductCategory? ParentCategory { get; set; }

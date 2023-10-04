@@ -20,8 +20,8 @@
         public bool IsDelivered { get; set; } = false;
         public decimal TotalCost { get; set; }
 
-        public LandedCostDTOLocation? SourceLocation = new();
-        public LandedCostDTOLocation? TargetLocation = new();
+        public LandedCostDTOLocation? SourceLocation { get; set; }
+        public LandedCostDTOLocation? TargetLocation { get; set; }
     }
     public class LandedCostCreateDTO : LandedCostBaseDTO
     {

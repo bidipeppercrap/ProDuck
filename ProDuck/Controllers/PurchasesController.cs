@@ -25,7 +25,7 @@ namespace ProDuck.Controllers
         }
 
         [HttpGet]
-        public async Task<PaginatedResponse> Get([FromQuery] PaginationParams qp, [FromQuery] long? vendorId, [FromQuery] bool showNotDelivered = false)
+        public async Task<PaginatedResponse> Get([FromQuery] PaginationParams qp, [FromQuery] long? vendorId, [FromQuery] bool showNotDelivered = false, [FromQuery] string keyword = "")
         {
             var whereQuery = _context.Purchases
                 .Include(p => p.Vendor)
@@ -34,7 +34,23 @@ namespace ProDuck.Controllers
                 .AsQueryable();
 
             if (vendorId != null) whereQuery = whereQuery.Where(x => x.VendorId == vendorId);
-            if (showNotDelivered) whereQuery = whereQuery.Where(x => x.Orders.Sum(o => o.Quantity) != 0 && x.Orders.All(x => x.Quantity > x.LandedCostItems.Where(xx => (xx.LandedCost != null && xx.LandedCost.IsDelivered && xx.LandedCost.IsPurchase) || (xx.LandedCost == null && xx.LandedCostItemId != null && xx.Parent!.LandedCost!.IsDelivered && xx.Parent!.LandedCost!.IsPurchase)).Sum(xx => xx.Qty)));
+            if (showNotDelivered) whereQuery = whereQuery.Where(x =>
+                x.Orders.Sum(o => o.Quantity) != 0
+                &&
+                x.Orders.Any(o =>
+                    o.Quantity != 0 &&
+                    o.Quantity
+                    >
+                    o.LandedCostItems.Where(xx =>
+                        (xx.LandedCost != null && xx.LandedCost.IsDelivered && xx.LandedCost.IsPurchase))
+                    .Sum(xx => xx.Qty)
+                    +
+                    o.LandedCostItems.Where(xx =>
+                        (xx.LandedCost == null && xx.LandedCostItemId != null && xx.Parent!.LandedCost!.IsDelivered && xx.Parent!.LandedCost!.IsPurchase))
+                    .Sum(xx => xx.Qty)));
+
+            var words = keyword.Trim().Split(" ");
+            foreach (var word in words) whereQuery = whereQuery.Where(x => x.Vendor.Name.Contains(word) || x.SourceDocument.Contains(word) || x.Memo.Contains(word));
 
             var result = await whereQuery
                 .OrderByDescending(x => x.Date)
@@ -164,7 +180,15 @@ namespace ProDuck.Controllers
                     Name = purchase.Vendor.Name
                 },
                 TotalCost = purchase.Orders.Sum(o => o.Cost * o.Quantity),
-                AllDelivered = purchase.Orders.All(x => x.Quantity <= x.LandedCostItems.Where(xx => (xx.LandedCost != null && xx.LandedCost.IsDelivered && xx.LandedCost.IsPurchase) || (xx.LandedCost == null && xx.LandedCostItemId != null && xx.Parent!.LandedCost!.IsDelivered && xx.Parent!.LandedCost!.IsPurchase)).Sum(xx => xx.Qty))
+                AllDelivered = purchase.Orders.All(x => x.Quantity
+                    <=
+                    x.LandedCostItems.Where(xx =>
+                        (xx.LandedCost != null && xx.LandedCost.IsDelivered && xx.LandedCost.IsPurchase))
+                        .Sum(xx => xx.Qty)
+                    +
+                    x.LandedCostItems.Where(xx =>
+                        xx.LandedCost == null && xx.LandedCostItemId != null && xx.Parent!.LandedCost!.IsDelivered && xx.Parent!.LandedCost!.IsPurchase)
+                        .Sum(xx => xx.Qty))
             };
 
             return dto;

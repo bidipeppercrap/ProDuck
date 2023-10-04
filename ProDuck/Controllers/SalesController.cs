@@ -22,6 +22,8 @@ namespace ProDuck.Controllers
             _context = context;
         }
 
+        private record Payload(PagedList<SaleItemDTO> Sales, decimal TotalProfit);
+
         private static SaleItemDTO SaleItemToDTO(Product product)
         {
             var dto = new SaleItemDTO
@@ -41,18 +43,25 @@ namespace ProDuck.Controllers
         {
             try
             {
-                var result = await _context.Products
+                var whereQuery = _context.Products
                     .Include(x => x.OrderItems)
                         .ThenInclude(oi => oi.Order)
                     .Where(x =>
                         x.OrderItems.Any(oi => DateOnly.FromDateTime(oi.Order.CreatedAt) >= startDate) &&
                         x.OrderItems.Any(oi => DateOnly.FromDateTime(oi.Order.CreatedAt) <= endDate))
-                    .Where(x => x.OrderItems.Sum(oi => oi.Qty) != 0)
+                    .Where(x => x.OrderItems.Sum(oi => oi.Qty) != 0).AsQueryable();
+
+                var result = await whereQuery
                     .OrderByDescending(x => x.OrderItems.Sum(oi => oi.Qty))
                     .Select(x => SaleItemToDTO(x))
                     .ToPagedListAsync(qp.Page, qp.PageSize);
 
-                return new PaginatedResponse(result, new Pagination
+                var totalProfit = await whereQuery
+                    .SumAsync(x => x.OrderItems.Sum(oi => (oi.Price - oi.Cost) * oi.Qty));
+
+                var payload = new Payload(result, totalProfit);
+
+                return new PaginatedResponse(payload, new Pagination
                 {
                     Count = result.Count,
                     Page = qp.Page,

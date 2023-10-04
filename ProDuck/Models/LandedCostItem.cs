@@ -6,8 +6,8 @@
         public int Qty { get; set; }
         public decimal Cost { get; set; }
 
-        public long PurchaseOrderId { get; set; }
-        public PurchaseOrder PurchaseOrder { get; set; } = null!;
+        public long? PurchaseOrderId { get; set; }
+        public PurchaseOrder? PurchaseOrder { get; set; }
         
         public long? LandedCostId { get; set; }
         public LandedCost? LandedCost { get; set; }

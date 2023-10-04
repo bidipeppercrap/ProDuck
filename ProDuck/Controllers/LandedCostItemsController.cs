@@ -36,11 +36,11 @@ namespace ProDuck.Controllers
                     PurchaseOrderId = child.PurchaseOrderId,
                     LandedCostId = child.LandedCostId,
                     LandedCostItemId = child.LandedCostItemId,
-                    PurchaseOrder = new LandedCostItemDTOPurchaseOrder
+                    PurchaseOrder = child.PurchaseOrder != null ? new LandedCostItemDTOPurchaseOrder
                     {
                         Id = child.PurchaseOrder.Id,
                         Description = child.PurchaseOrder.Description,
-                    }
+                    } : null
                 });
             }
             
@@ -53,11 +53,11 @@ namespace ProDuck.Controllers
                 LandedCostId = item.LandedCostId,
                 LandedCostItemId = item.LandedCostItemId,
                 Children = childrenDTO,
-                PurchaseOrder = new LandedCostItemDTOPurchaseOrder
+                PurchaseOrder = item.PurchaseOrder != null ? new LandedCostItemDTOPurchaseOrder
                 {
                     Id = item.PurchaseOrder.Id,
                     Description = item.PurchaseOrder.Description,
-                }
+                } : null
             };
 
             return dto;
@@ -67,10 +67,9 @@ namespace ProDuck.Controllers
         public async Task<PaginatedResponse> GetByLandedCost(long id, [FromQuery] PaginationParams qp, [FromQuery] string keyword = "")
         {
             var items = await _context.LandedCostItems
-                .Include(x => x.PurchaseOrder).ThenInclude(xx => xx.Product)
-                .Include(x => x.Children)
+                .Include(x => x.PurchaseOrder).ThenInclude(xx => xx!.Product)
+                .Include(x => x.Children).ThenInclude(xx => xx.PurchaseOrder).ThenInclude(xxx => xxx!.Product)
                 .Where(x => x.LandedCostId == id)
-                .Where(x => x.PurchaseOrder.Product.Name.Contains(keyword))
                 .Select(x => ItemToDTO(x))
                 .ToPagedListAsync(qp.Page, qp.PageSize);
 
@@ -87,6 +86,7 @@ namespace ProDuck.Controllers
         public async Task<IActionResult> Post([FromBody] LandedCostItemCreateDTO dto)
         {
             if (dto.LandedCostItemId == null && dto.LandedCostId == null) throw new ApiException("Both Landed Cost Item and Landed Cost cannot be null");
+            if (dto.PurchaseOrderId != null && dto.LandedCostItemId != null && dto.LandedCostId != null) throw new ApiException("Parent Landed Cost cannot have a Purchase Order");
 
             var landedCostItem = new LandedCostItem
             {

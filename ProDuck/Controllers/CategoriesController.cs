@@ -31,7 +31,9 @@ namespace ProDuck.Controllers
                 Description = category.Description,
                 ProductCategoryId = category.ProductCategoryId,
                 ProductsCount = category.Products.Count,
-                ChildCategoriesCount = category.ChildCategories.Count
+                ChildCategoriesCount = category.ChildCategories.Count,
+                MinQty = category.MinQty,
+                TotalStock = category.Products.Sum(xx => xx.Stocks.Sum(s => s.Stock))
             };
 
         [HttpGet]
@@ -69,6 +71,24 @@ namespace ProDuck.Controllers
             return new PaginatedResponse(result, new Pagination { Count = result.Count, Page = qp.Page, PageSize = qp.PageSize, TotalPages = result.TotalPages });
         }
 
+        [HttpGet("replenishment")]
+        public async Task<PaginatedResponse> GetReplenishment([FromQuery] PaginationParams qp)
+        {
+            var categories = await _context.ProductCategories
+                .Include(x => x.Products).ThenInclude(xx => xx.Stocks)
+                .Where(x => x.MinQty >= x.Products.Sum(xx => xx.Stocks.Sum(s => s.Stock)))
+                .Select(x => CategoryToDTO(x))
+                .ToPagedListAsync(qp.Page, qp.PageSize);
+
+            return new PaginatedResponse(categories, new Pagination
+            {
+                Count = categories.Count,
+                Page = qp.Page,
+                PageSize = qp.PageSize,
+                TotalPages = categories.TotalPages
+            });
+        }
+
         [HttpGet("{id}")]
         public async Task<PaginatedResponse> GetCategory(long id)
         {
@@ -92,6 +112,7 @@ namespace ProDuck.Controllers
             {
                 Name = categoryDTO.Name,
                 Description = categoryDTO.Description,
+                MinQty = categoryDTO.MinQty ?? 0
             };
 
             if (categoryDTO.ProductCategoryId != null)
@@ -127,7 +148,8 @@ namespace ProDuck.Controllers
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(c => c.Name, categoryDTO.Name)
                     .SetProperty(c => c.Description, categoryDTO.Description)
-                    .SetProperty(c => c.ProductCategoryId, categoryDTO.ProductCategoryId));
+                    .SetProperty(c => c.ProductCategoryId, categoryDTO.ProductCategoryId)
+                    .SetProperty(c => c.MinQty, categoryDTO.MinQty ?? 0));
 
             return NoContent();
         }
