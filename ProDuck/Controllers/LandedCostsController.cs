@@ -7,6 +7,7 @@ using ProDuck.Models;
 using ProDuck.QueryParams;
 using ProDuck.Responses;
 using ProDuck.Types;
+using System.Linq;
 
 namespace ProDuck.Controllers
 {
@@ -90,6 +91,8 @@ namespace ProDuck.Controllers
             return new PaginatedResponse(landedCost);
         }
 
+        private record PurchaseOrderSum(long ProductId, decimal CostSum);
+
         [HttpPost("deliver")]
         public async Task<IActionResult> Deliver([FromBody] long id)
         {
@@ -108,160 +111,81 @@ namespace ProDuck.Controllers
 
                 await _context.SaveChangesAsync();
 
-                // Update Stock to Source / Target Location
-                foreach (var item in landedCost.Items)
-                {
-                    if (item.PurchaseOrderId != null && item.LandedCostItemId == null)
-                    {
-                        var stock = await _context.StockLocation
-                            .Where(x => x.LocationId.Equals(landedCost.TargetLocationId))
-                            .Where(x => x.ProductId.Equals(item.PurchaseOrder!.ProductId))
-                            .FirstOrDefaultAsync();
-
-                        if (stock != null)
-                        {
-                            stock.Stock += item.Qty;
-                            _context.StockLocation.Update(stock);
-                            await _context.SaveChangesAsync();
-
-                        }
-                        if (stock == null)
-                        {
-                            var newStock = new StockLocation
-                            {
-                                LocationId = landedCost.TargetLocationId,
-                                ProductId = item.PurchaseOrder!.ProductId,
-                                Stock = item.Qty
-                            };
-
-                            _context.StockLocation.Add(newStock);
-                            await _context.SaveChangesAsync();
-                        }
-                    }
-
-                    if (item.PurchaseOrderId == null) foreach (var child in item.Children)
-                    {
-                        var childStock = await _context.StockLocation
-                            .Where(x => x.LocationId.Equals(landedCost.TargetLocationId))
-                            .Where(x => x.ProductId.Equals(child.PurchaseOrder!.ProductId))
-                            .FirstOrDefaultAsync();
-
-                            if (childStock != null)
-                            {
-                                childStock.Stock += item.Qty;
-                                _context.StockLocation.Update(childStock);
-                                await _context.SaveChangesAsync();
-                            }
-                            if (childStock == null)
-                        {
-                            var newStock = new StockLocation
-                            {
-                                LocationId = landedCost.TargetLocationId,
-                                ProductId = child.PurchaseOrder!.ProductId,
-                                Stock = child.Qty
-                            };
-
-                            _context.StockLocation.Add(newStock);
-                            await _context.SaveChangesAsync();
-                        }
-                    }
-                }
-
-                if (!landedCost.IsPurchase) foreach (var item in landedCost.Items)
-                {
-                    if (item.PurchaseOrderId != null && item.LandedCostItemId == null)
-                    {
-                        var stock = await _context.StockLocation
-                        .Where(x => x.LocationId.Equals(landedCost.SourceLocationId))
-                        .Where(x => x.ProductId.Equals(item.PurchaseOrder!.ProductId))
-                        .FirstOrDefaultAsync();
-
-                        if (stock != null)
-                        {
-                            stock.Stock -= item.Qty;
-                            _context.StockLocation.Update(stock);
-                            await _context.SaveChangesAsync();
-
-                        }
-                        if (stock == null)
-                        {
-                            var newStock = new StockLocation
-                            {
-                                LocationId = landedCost.SourceLocationId,
-                                ProductId = item.PurchaseOrder!.ProductId,
-                                Stock = item.Qty * -1
-                            };
-
-                            _context.StockLocation.Add(newStock);
-                            await _context.SaveChangesAsync();
-                            }
-                    }
-
-                    if (item.PurchaseOrderId == null) foreach (var child in item.Children)
-                    {
-                        var childStock = await _context.StockLocation
-                            .Where(x => x.LocationId.Equals(landedCost.SourceLocationId))
-                            .Where(x => x.ProductId.Equals(child.PurchaseOrder!.ProductId))
-                            .FirstOrDefaultAsync();
-
-                        if (childStock != null)
-                        {
-                            childStock.Stock -= item.Qty;
-                            _context.StockLocation.Update(childStock);
-                            await _context.SaveChangesAsync();
-
-                        }
-                        if (childStock == null)
-                        {
-                            var newStock = new StockLocation
-                            {
-                                LocationId = landedCost.SourceLocationId,
-                                ProductId = child.PurchaseOrder!.ProductId,
-                                Stock = child.Qty * -1
-                            };
-
-                            _context.StockLocation.Add(newStock);
-                            await _context.SaveChangesAsync();
-                        }
-                    }
-                }
-
-                var products = await _context.Products
-                    .Include(x => x.PurchaseOrders).ThenInclude(po => po.LandedCostItems).ThenInclude(lci => lci.LandedCost)
-                    .Include(x => x.PurchaseOrders).ThenInclude(po => po.LandedCostItems).ThenInclude(lci => lci.Parent).ThenInclude(lcip => lcip!.Children)
-                    .Where(x => x.PurchaseOrders
-                        .Any(po => po.LandedCostItems
-                            .Any(lci => (lci.LandedCost != null && lci.LandedCost.IsDelivered && lci.PurchaseOrderId != null) || (lci.Parent != null && lci.PurchaseOrderId != null && lci.Parent!.LandedCost!.IsDelivered))
-                            &&
-                            x.Cost
-                            <
-                            po!.Cost
-                            + po.LandedCostItems.Where(lci => lci.LandedCost != null && lci.LandedCost.IsDelivered && lci.PurchaseOrderId != null).Sum(lci => lci.Cost / lci.Qty * (lci.Qty / po.Quantity))
-                            + po.LandedCostItems.Where(lci => lci.Parent != null && lci.Parent!.LandedCost!.IsDelivered && lci.PurchaseOrderId != null).Sum(lci => (((lci.Parent!.Children.Sum(child => po.Cost * child.Qty) / (po.Cost * lci.Qty)) * lci.Parent.Cost) / lci.Qty) * (lci.Qty / po.Quantity))
-
-                        )
-                    )
+                var items = await _context.LandedCostItems
+                    .Include(x => x.Parent)
+                    .Include(x => x.PurchaseOrder)
+                    .Where(x => (x.PurchaseOrderId != null && x.LandedCostId.Equals(id)) || (x.PurchaseOrderId != null && x.LandedCostItemId != null && x.Parent!.LandedCostId.Equals(id)))
                     .ToListAsync();
 
-                foreach (var p in products)
+                foreach(var x in items)
                 {
-                    var sumQuery = _context.PurchaseOrders
-                        .Include(x => x.LandedCostItems).ThenInclude(lci => lci.LandedCost)
-                        .Include(x => x.LandedCostItems).ThenInclude(lci => lci.Parent).ThenInclude(lcip => lcip!.Children)
-                        .Where(x => x.ProductId.Equals(p.Id))
-                        .Where(x => x.LandedCostItems
-                            .Any(lci => (lci.LandedCost != null && lci.LandedCost.IsDelivered && lci.PurchaseOrderId != null) || (lci.Parent != null && lci.Parent!.LandedCost!.IsDelivered && lci.PurchaseOrderId != null))).AsQueryable();
-
-                    var sum = await sumQuery
-                        .Select(x => x.Cost
-                            + x.LandedCostItems.Where(lci2 => lci2.LandedCost != null && lci2.LandedCost.IsDelivered && lci2.PurchaseOrderId != null).Sum(lci2 => lci2.Cost / lci2.Qty * (lci2.Qty / x.Quantity)
-                            + x.LandedCostItems.Where(lci2 => lci2.Parent != null && lci2.Parent!.LandedCost!.IsDelivered && lci2.PurchaseOrderId != null).Sum(lci2 => (((lci2.Parent!.Children.Sum(child => x.Cost * child.Qty) / (x.Cost * lci2.Qty)) * lci2.Parent.Cost) / lci2.Qty) * (lci2.Qty / x.Quantity))))
+                    var targetStock = await _context.StockLocation
+                        .Where(s => s.LocationId.Equals(landedCost.TargetLocationId))
+                        .Where(s => s.ProductId.Equals(x.PurchaseOrder!.ProductId))
                         .FirstOrDefaultAsync();
 
+                    if (targetStock != null)
+                    {
+                        targetStock.Stock += x.Qty;
+                        _context.StockLocation.Update(targetStock);
+                    }
+                    if (targetStock == null)
+                    {
+                        var newStock = new StockLocation { LocationId = landedCost.TargetLocationId, ProductId = x.PurchaseOrder!.ProductId, Stock = x.Qty };
+                        _context.StockLocation.Add(newStock);
+                    }
+
+                    if (!landedCost.IsPurchase)
+                    {
+                        var sourceStock = await _context.StockLocation
+                            .Where(s => s.LocationId.Equals(landedCost.SourceLocationId))
+                            .Where(s => s.ProductId.Equals(x.PurchaseOrder!.ProductId))
+                            .FirstOrDefaultAsync();
+
+                        if (sourceStock != null)
+                        {
+                            sourceStock.Stock -= x.Qty;
+                            _context.StockLocation.Update(sourceStock);
+                        }
+                        if (sourceStock == null)
+                        {
+                            var newStock = new StockLocation { LocationId = landedCost.SourceLocationId, ProductId = x.PurchaseOrder!.ProductId, Stock = x.Qty * -1 };
+                            _context.StockLocation.Add(newStock);
+                        }
+                    }
+
+                    await _context.SaveChangesAsync();
+                }
+
+                var purchaseOrders = await _context.PurchaseOrders
+                    .Include(x => x.LandedCostItems).ThenInclude(xx => xx.Parent).ThenInclude(xxx => xxx!.Children).ThenInclude(xxxx => xxxx.PurchaseOrder)
+                    .Where(x => x.LandedCostItems.Any(xx => xx.LandedCostId.Equals(id) || xx.Parent!.LandedCostId.Equals(id)))
+                    .Select(x => new PurchaseOrderSum(
+                        x.ProductId,
+                        x.Cost
+                            +
+                            x.LandedCostItems.Where(xx => xx.LandedCostId != null && xx.LandedCostItemId == null).Sum(xx => (xx.Cost / xx.Qty) * (xx.Qty / x.Quantity))
+                            +
+                            x.LandedCostItems.Where(xx => xx.LandedCostId == null && xx.LandedCostItemId != null).Sum(xx =>
+                                (((xx.Qty * x.Cost) / xx.Parent!.Children.Sum(c => c.Qty * c.PurchaseOrder!.Cost)
+                                *
+                                xx.Parent!.Cost)
+                                /
+                                xx.Qty)
+                                *
+                                (xx.Qty / x.Quantity)
+                            )
+                    ))
+                    .ToListAsync();
+
+                foreach(var po in purchaseOrders)
+                {
                     await _context.Products
-                        .Where(x => x.Id.Equals(p.Id))
+                        .Where(x => x.Id.Equals(po.ProductId))
+                        .Where(x => x.Cost < po.CostSum)
                         .ExecuteUpdateAsync(x => x
-                            .SetProperty(s => s.Cost, sum));
+                            .SetProperty(s => s.Cost, po.CostSum)
+                         );
                 }
 
                 await transaction.CommitAsync();
