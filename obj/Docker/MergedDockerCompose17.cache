@@ -1,0 +1,64 @@
+name: dockercompose2420191017739786828
+services:
+  database:
+    environment:
+      MYSQL_DATABASE: produck
+      MYSQL_PASSWORD: pesswerd
+      MYSQL_ROOT_PASSWORD: pesswerd_root
+      MYSQL_USER: produck
+    image: mariadb
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 3306
+        published: "3306"
+        protocol: tcp
+    restart: always
+    volumes:
+      - type: volume
+        source: data
+        target: /var/lib/mysql
+        volume: {}
+      - type: bind
+        source: C:\Users\bidip\source\repos\ProDuck\sql_scripts
+        target: /docker-entrypoint-initdb.d
+        bind:
+          create_host_path: true
+  produck:
+    build:
+      context: C:\Users\bidip\source\repos\ProDuck
+      dockerfile: ProDuck/Dockerfile
+    depends_on:
+      database:
+        condition: service_started
+        required: true
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      Database:ConnectionString: Server=database; User ID=produck; Password=pesswerd; Database=produck
+      JwtSettings:SigningKey: ""
+    image: produck
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 80
+        protocol: tcp
+      - mode: ingress
+        target: 80
+        published: "5000"
+        protocol: tcp
+    restart: always
+    volumes:
+      - type: bind
+        source: C:\Users\bidip\AppData\Roaming/Microsoft/UserSecrets
+        target: /root/.microsoft/usersecrets
+        read_only: true
+        bind:
+          create_host_path: true
+networks:
+  default:
+    name: dockercompose2420191017739786828_default
+volumes:
+  data:
+    name: dockercompose2420191017739786828_data

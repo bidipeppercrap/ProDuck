@@ -28,4 +28,5 @@ services:
     restart: always
     environment:
       - Database:ConnectionString=Server=database; User ID=produck; Password=pesswerd; Database=produck
+      - JwtSettings:SigningKey=L{Vy|!t#Diu#:`9l2@7Y*_dRZ*g'6SR3-vu`Zr<0IE>!3mPcwkPqqbs;]0+4JS*
       - ASPNETCORE_ENVIRONMENT=Production
