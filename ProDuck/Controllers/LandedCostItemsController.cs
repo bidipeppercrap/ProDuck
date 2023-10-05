@@ -1,4 +1,5 @@
 ﻿using AutoWrapper.Wrappers;
+using Humanizer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -97,24 +98,49 @@ namespace ProDuck.Controllers
                 LandedCostItemId = dto.LandedCostItemId,
             };
 
-            Console.WriteLine(landedCostItem);
-
             _context.LandedCostItems.Add(landedCostItem);
             await _context.SaveChangesAsync();
 
             return NoContent();
         }
 
-        // PUT api/<LandedCostItemsController>/5
         [HttpPut("{id}")]
-        public void Put(int id, [FromBody] string value)
+        public async Task<IActionResult> Put(long id, [FromBody] LandedCostItemCreateDTO dto)
         {
+            var landedCostItem = await _context.LandedCostItems.FindAsync(id) ?? throw new ApiException("Landed Cost Item not found");
+
+            if (dto.LandedCostItemId == null && dto.LandedCostId == null) throw new ApiException("Both Landed Cost Item and Landed Cost cannot be null");
+            if (dto.PurchaseOrderId != null && dto.LandedCostItemId != null && dto.LandedCostId != null) throw new ApiException("Parent Landed Cost cannot have a Purchase Order");
+
+            landedCostItem.Qty = dto.Qty;
+            landedCostItem.Cost = dto.Cost;
+            landedCostItem.PurchaseOrderId = dto.PurchaseOrderId;
+            landedCostItem.LandedCostId = dto.LandedCostId;
+            landedCostItem.LandedCostItemId = dto.LandedCostItemId;
+
+            _context.LandedCostItems.Update(landedCostItem);
+            await _context.SaveChangesAsync();
+
+            return NoContent();
         }
 
-        // DELETE api/<LandedCostItemsController>/5
         [HttpDelete("{id}")]
-        public void Delete(int id)
+        public async Task<IActionResult> Delete(long id)
         {
+            var landedCostItem = _context.LandedCostItems
+                .Where(x => x.Id.Equals(id))
+                .Include(x => x.Children)
+                .AsQueryable();
+
+            if (await landedCostItem.FirstOrDefaultAsync() == null) throw new ApiException("Landed Cost Item not found");
+
+            var toDelete = await landedCostItem.FirstAsync();
+
+            _context.LandedCostItems.Remove(toDelete);
+
+            await _context.SaveChangesAsync();
+
+            return NoContent();
         }
     }
 }

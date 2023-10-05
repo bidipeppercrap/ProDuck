@@ -1,7 +1,10 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using AutoWrapper.Wrappers;
+using Isopoh.Cryptography.Argon2;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using ProDuck.DTO;
 using ProDuck.Models;
 using ProDuck.Responses;
 
@@ -47,6 +50,52 @@ namespace ProDuck.Controllers
             var payload = new DashboardPayload(needReplenishmentCount, badProductPriceCount, badCustomerPriceCount);
 
             return new PaginatedResponse(payload);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> CreateRootUser(UserCreateDTO userDTO)
+        {
+            using var transaction = _context.Database.BeginTransaction();
+
+            try
+            {
+                var users = _context.Users
+                .Count();
+
+                if (users > 0) return Unauthorized("Root user already exitsts");
+
+                var passwordHash = Argon2.Hash(userDTO.Password);
+
+                var user = new User
+                {
+                    Name = userDTO.Name ?? null,
+                    Username = userDTO.Username,
+                    Password = passwordHash,
+                };
+
+                _context.Users.Add(user);
+                await _context.SaveChangesAsync();
+
+                var claim = new Claim
+                {
+                    Name = "root",
+                };
+
+                _context.Claims.Add(claim);
+                await _context.SaveChangesAsync();
+
+                user.Claims.Add(claim);
+                await _context.SaveChangesAsync();
+
+                await transaction.CommitAsync();
+            }
+            catch (Exception ex)
+            {
+                if (ex.InnerException != null) throw new ApiException(ex.InnerException.Message);
+                throw new ApiException(ex.Message);
+            }
+
+            return NoContent();
         }
     }
 }

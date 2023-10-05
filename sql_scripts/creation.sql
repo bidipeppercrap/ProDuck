@@ -1,0 +1,888 @@
+﻿CREATE TABLE IF NOT EXISTS `__EFMigrationsHistory` (
+    `MigrationId` varchar(150) CHARACTER SET utf8mb4 NOT NULL,
+    `ProductVersion` varchar(32) CHARACTER SET utf8mb4 NOT NULL,
+    CONSTRAINT `PK___EFMigrationsHistory` PRIMARY KEY (`MigrationId`)
+) CHARACTER SET=utf8mb4;
+
+START TRANSACTION;
+
+ALTER DATABASE CHARACTER SET utf8mb4;
+
+CREATE TABLE `Products` (
+    `Id` bigint NOT NULL AUTO_INCREMENT,
+    `Name` longtext CHARACTER SET utf8mb4 NULL,
+    `Price` int NOT NULL,
+    `Cost` int NOT NULL,
+    `Barcode` longtext CHARACTER SET utf8mb4 NULL,
+    CONSTRAINT `PK_Products` PRIMARY KEY (`Id`)
+) CHARACTER SET=utf8mb4;
+
+INSERT INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`)
+VALUES ('20230519123312_InitialCreate', '7.0.5');
+
+COMMIT;
+
+START TRANSACTION;
+
+CREATE TABLE `PointOfSale` (
+    `Id` bigint NOT NULL AUTO_INCREMENT,
+    `Name` longtext CHARACTER SET utf8mb4 NULL,
+    `Description` longtext CHARACTER SET utf8mb4 NULL,
+    CONSTRAINT `PK_PointOfSale` PRIMARY KEY (`Id`)
+) CHARACTER SET=utf8mb4;
+
+CREATE TABLE `Users` (
+    `Id` bigint NOT NULL AUTO_INCREMENT,
+    `Username` longtext CHARACTER SET utf8mb4 NULL,
+    `Name` longtext CHARACTER SET utf8mb4 NULL,
+    `Password` longtext CHARACTER SET utf8mb4 NULL,
+    CONSTRAINT `PK_Users` PRIMARY KEY (`Id`)
+) CHARACTER SET=utf8mb4;
+
+CREATE TABLE `POSSession` (
+    `Id` bigint NOT NULL AUTO_INCREMENT,
+    `Note` longtext CHARACTER SET utf8mb4 NULL,
+    `StartedAt` datetime(6) NOT NULL,
+    `ClosedAt` datetime(6) NOT NULL,
+    `UserId` bigint NOT NULL,
+    CONSTRAINT `PK_POSSession` PRIMARY KEY (`Id`),
+    CONSTRAINT `FK_POSSession_Users_UserId` FOREIGN KEY (`UserId`) REFERENCES `Users` (`Id`) ON DELETE CASCADE
+) CHARACTER SET=utf8mb4;
+
+CREATE INDEX `IX_POSSession_UserId` ON `POSSession` (`UserId`);
+
+INSERT INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`)
+VALUES ('20230519141447_AddPOSSession', '7.0.5');
+
+COMMIT;
+
+START TRANSACTION;
+
+UPDATE `Users` SET `Username` = ''
+WHERE `Username` IS NULL;
+SELECT ROW_COUNT();
+
+
+ALTER TABLE `Users` MODIFY COLUMN `Username` longtext CHARACTER SET utf8mb4 NOT NULL;
+
+UPDATE `Users` SET `Password` = ''
+WHERE `Password` IS NULL;
+SELECT ROW_COUNT();
+
+
+ALTER TABLE `Users` MODIFY COLUMN `Password` longtext CHARACTER SET utf8mb4 NOT NULL;
+
+UPDATE `Products` SET `Name` = ''
+WHERE `Name` IS NULL;
+SELECT ROW_COUNT();
+
+
+ALTER TABLE `Products` MODIFY COLUMN `Name` longtext CHARACTER SET utf8mb4 NOT NULL;
+
+ALTER TABLE `POSSession` ADD `POSId` bigint NOT NULL DEFAULT 0;
+
+UPDATE `PointOfSale` SET `Name` = ''
+WHERE `Name` IS NULL;
+SELECT ROW_COUNT();
+
+
+ALTER TABLE `PointOfSale` MODIFY COLUMN `Name` longtext CHARACTER SET utf8mb4 NOT NULL;
+
+CREATE TABLE `Location` (
+    `Id` bigint NOT NULL AUTO_INCREMENT,
+    `Name` longtext CHARACTER SET utf8mb4 NOT NULL,
+    `LocationId` bigint NOT NULL,
+    CONSTRAINT `PK_Location` PRIMARY KEY (`Id`),
+    CONSTRAINT `FK_Location_Location_LocationId` FOREIGN KEY (`LocationId`) REFERENCES `Location` (`Id`) ON DELETE CASCADE
+) CHARACTER SET=utf8mb4;
+
+CREATE TABLE `StockLocation` (
+    `Id` bigint NOT NULL AUTO_INCREMENT,
+    `Stock` int NOT NULL,
+    `ProductId` bigint NOT NULL,
+    `LocationId` bigint NOT NULL,
+    CONSTRAINT `PK_StockLocation` PRIMARY KEY (`Id`),
+    CONSTRAINT `FK_StockLocation_Location_LocationId` FOREIGN KEY (`LocationId`) REFERENCES `Location` (`Id`) ON DELETE CASCADE,
+    CONSTRAINT `FK_StockLocation_Products_ProductId` FOREIGN KEY (`ProductId`) REFERENCES `Products` (`Id`) ON DELETE CASCADE
+) CHARACTER SET=utf8mb4;
+
+CREATE INDEX `IX_POSSession_POSId` ON `POSSession` (`POSId`);
+
+CREATE INDEX `IX_Location_LocationId` ON `Location` (`LocationId`);
+
+CREATE INDEX `IX_StockLocation_LocationId` ON `StockLocation` (`LocationId`);
+
+CREATE INDEX `IX_StockLocation_ProductId` ON `StockLocation` (`ProductId`);
+
+ALTER TABLE `POSSession` ADD CONSTRAINT `FK_POSSession_PointOfSale_POSId` FOREIGN KEY (`POSId`) REFERENCES `PointOfSale` (`Id`) ON DELETE CASCADE;
+
+INSERT INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`)
+VALUES ('20230708150434_addedStockLocation', '7.0.5');
+
+COMMIT;
+
+START TRANSACTION;
+
+ALTER TABLE `Products` MODIFY COLUMN `Barcode` varchar(255) CHARACTER SET utf8mb4 NULL;
+
+CREATE UNIQUE INDEX `IX_Products_Barcode` ON `Products` (`Barcode`);
+
+INSERT INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`)
+VALUES ('20230708151918_makeBarcodeUnique', '7.0.5');
+
+COMMIT;
+
+START TRANSACTION;
+
+DROP PROCEDURE IF EXISTS `POMELO_BEFORE_DROP_PRIMARY_KEY`;
+DELIMITER //
+CREATE PROCEDURE `POMELO_BEFORE_DROP_PRIMARY_KEY`(IN `SCHEMA_NAME_ARGUMENT` VARCHAR(255), IN `TABLE_NAME_ARGUMENT` VARCHAR(255))
+BEGIN
+	DECLARE HAS_AUTO_INCREMENT_ID TINYINT(1);
+	DECLARE PRIMARY_KEY_COLUMN_NAME VARCHAR(255);
+	DECLARE PRIMARY_KEY_TYPE VARCHAR(255);
+	DECLARE SQL_EXP VARCHAR(1000);
+	SELECT COUNT(*)
+		INTO HAS_AUTO_INCREMENT_ID
+		FROM `information_schema`.`COLUMNS`
+		WHERE `TABLE_SCHEMA` = (SELECT IFNULL(SCHEMA_NAME_ARGUMENT, SCHEMA()))
+			AND `TABLE_NAME` = TABLE_NAME_ARGUMENT
+			AND `Extra` = 'auto_increment'
+			AND `COLUMN_KEY` = 'PRI'
+			LIMIT 1;
+	IF HAS_AUTO_INCREMENT_ID THEN
+		SELECT `COLUMN_TYPE`
+			INTO PRIMARY_KEY_TYPE
+			FROM `information_schema`.`COLUMNS`
+			WHERE `TABLE_SCHEMA` = (SELECT IFNULL(SCHEMA_NAME_ARGUMENT, SCHEMA()))
+				AND `TABLE_NAME` = TABLE_NAME_ARGUMENT
+				AND `COLUMN_KEY` = 'PRI'
+			LIMIT 1;
+		SELECT `COLUMN_NAME`
+			INTO PRIMARY_KEY_COLUMN_NAME
+			FROM `information_schema`.`COLUMNS`
+			WHERE `TABLE_SCHEMA` = (SELECT IFNULL(SCHEMA_NAME_ARGUMENT, SCHEMA()))
+				AND `TABLE_NAME` = TABLE_NAME_ARGUMENT
+				AND `COLUMN_KEY` = 'PRI'
+			LIMIT 1;
+		SET SQL_EXP = CONCAT('ALTER TABLE `', (SELECT IFNULL(SCHEMA_NAME_ARGUMENT, SCHEMA())), '`.`', TABLE_NAME_ARGUMENT, '` MODIFY COLUMN `', PRIMARY_KEY_COLUMN_NAME, '` ', PRIMARY_KEY_TYPE, ' NOT NULL;');
+		SET @SQL_EXP = SQL_EXP;
+		PREPARE SQL_EXP_EXECUTE FROM @SQL_EXP;
+		EXECUTE SQL_EXP_EXECUTE;
+		DEALLOCATE PREPARE SQL_EXP_EXECUTE;
+	END IF;
+END //
+DELIMITER ;
+
+DROP PROCEDURE IF EXISTS `POMELO_AFTER_ADD_PRIMARY_KEY`;
+DELIMITER //
+CREATE PROCEDURE `POMELO_AFTER_ADD_PRIMARY_KEY`(IN `SCHEMA_NAME_ARGUMENT` VARCHAR(255), IN `TABLE_NAME_ARGUMENT` VARCHAR(255), IN `COLUMN_NAME_ARGUMENT` VARCHAR(255))
+BEGIN
+	DECLARE HAS_AUTO_INCREMENT_ID INT(11);
+	DECLARE PRIMARY_KEY_COLUMN_NAME VARCHAR(255);
+	DECLARE PRIMARY_KEY_TYPE VARCHAR(255);
+	DECLARE SQL_EXP VARCHAR(1000);
+	SELECT COUNT(*)
+		INTO HAS_AUTO_INCREMENT_ID
+		FROM `information_schema`.`COLUMNS`
+		WHERE `TABLE_SCHEMA` = (SELECT IFNULL(SCHEMA_NAME_ARGUMENT, SCHEMA()))
+			AND `TABLE_NAME` = TABLE_NAME_ARGUMENT
+			AND `COLUMN_NAME` = COLUMN_NAME_ARGUMENT
+			AND `COLUMN_TYPE` LIKE '%int%'
+			AND `COLUMN_KEY` = 'PRI';
+	IF HAS_AUTO_INCREMENT_ID THEN
+		SELECT `COLUMN_TYPE`
+			INTO PRIMARY_KEY_TYPE
+			FROM `information_schema`.`COLUMNS`
+			WHERE `TABLE_SCHEMA` = (SELECT IFNULL(SCHEMA_NAME_ARGUMENT, SCHEMA()))
+				AND `TABLE_NAME` = TABLE_NAME_ARGUMENT
+				AND `COLUMN_NAME` = COLUMN_NAME_ARGUMENT
+				AND `COLUMN_TYPE` LIKE '%int%'
+				AND `COLUMN_KEY` = 'PRI';
+		SELECT `COLUMN_NAME`
+			INTO PRIMARY_KEY_COLUMN_NAME
+			FROM `information_schema`.`COLUMNS`
+			WHERE `TABLE_SCHEMA` = (SELECT IFNULL(SCHEMA_NAME_ARGUMENT, SCHEMA()))
+				AND `TABLE_NAME` = TABLE_NAME_ARGUMENT
+				AND `COLUMN_NAME` = COLUMN_NAME_ARGUMENT
+				AND `COLUMN_TYPE` LIKE '%int%'
+				AND `COLUMN_KEY` = 'PRI';
+		SET SQL_EXP = CONCAT('ALTER TABLE `', (SELECT IFNULL(SCHEMA_NAME_ARGUMENT, SCHEMA())), '`.`', TABLE_NAME_ARGUMENT, '` MODIFY COLUMN `', PRIMARY_KEY_COLUMN_NAME, '` ', PRIMARY_KEY_TYPE, ' NOT NULL AUTO_INCREMENT;');
+		SET @SQL_EXP = SQL_EXP;
+		PREPARE SQL_EXP_EXECUTE FROM @SQL_EXP;
+		EXECUTE SQL_EXP_EXECUTE;
+		DEALLOCATE PREPARE SQL_EXP_EXECUTE;
+	END IF;
+END //
+DELIMITER ;
+
+ALTER TABLE `Location` DROP FOREIGN KEY `FK_Location_Location_LocationId`;
+
+ALTER TABLE `StockLocation` DROP FOREIGN KEY `FK_StockLocation_Location_LocationId`;
+
+CALL POMELO_BEFORE_DROP_PRIMARY_KEY(NULL, 'Location');
+ALTER TABLE `Location` DROP PRIMARY KEY;
+
+ALTER TABLE `Location` RENAME `Locations`;
+
+ALTER TABLE `Locations` DROP INDEX `IX_Location_LocationId`;
+
+CREATE INDEX `IX_Locations_LocationId` ON `Locations` (`LocationId`);
+
+ALTER TABLE `Locations` MODIFY COLUMN `LocationId` bigint NULL;
+
+ALTER TABLE `Locations` ADD CONSTRAINT `PK_Locations` PRIMARY KEY (`Id`);
+CALL POMELO_AFTER_ADD_PRIMARY_KEY(NULL, 'Locations', 'Id');
+
+ALTER TABLE `Locations` ADD CONSTRAINT `FK_Locations_Locations_LocationId` FOREIGN KEY (`LocationId`) REFERENCES `Locations` (`Id`);
+
+ALTER TABLE `StockLocation` ADD CONSTRAINT `FK_StockLocation_Locations_LocationId` FOREIGN KEY (`LocationId`) REFERENCES `Locations` (`Id`) ON DELETE CASCADE;
+
+INSERT INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`)
+VALUES ('20230713123217_OptionalParentLocation', '7.0.5');
+
+DROP PROCEDURE `POMELO_BEFORE_DROP_PRIMARY_KEY`;
+
+DROP PROCEDURE `POMELO_AFTER_ADD_PRIMARY_KEY`;
+
+COMMIT;
+
+START TRANSACTION;
+
+CREATE TABLE `Purchases` (
+    `Id` bigint NOT NULL AUTO_INCREMENT,
+    `Date` date NOT NULL,
+    `SourceDocument` longtext CHARACTER SET utf8mb4 NOT NULL,
+    `Memo` longtext CHARACTER SET utf8mb4 NOT NULL,
+    CONSTRAINT `PK_Purchases` PRIMARY KEY (`Id`)
+) CHARACTER SET=utf8mb4;
+
+CREATE TABLE `PurchaseOrders` (
+    `Id` bigint NOT NULL AUTO_INCREMENT,
+    `PurchaseId` bigint NOT NULL,
+    `ProductId` bigint NOT NULL,
+    `Cost` int NOT NULL,
+    CONSTRAINT `PK_PurchaseOrders` PRIMARY KEY (`Id`),
+    CONSTRAINT `FK_PurchaseOrders_Purchases_PurchaseId` FOREIGN KEY (`PurchaseId`) REFERENCES `Purchases` (`Id`) ON DELETE CASCADE
+) CHARACTER SET=utf8mb4;
+
+CREATE INDEX `IX_PurchaseOrders_PurchaseId` ON `PurchaseOrders` (`PurchaseId`);
+
+INSERT INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`)
+VALUES ('20230725123215_Purchase', '7.0.5');
+
+COMMIT;
+
+START TRANSACTION;
+
+ALTER TABLE `Purchases` ADD `VendorId` bigint NOT NULL DEFAULT 0;
+
+CREATE TABLE `Vendor` (
+    `Id` bigint NOT NULL AUTO_INCREMENT,
+    `Name` longtext CHARACTER SET utf8mb4 NOT NULL,
+    `Description` longtext CHARACTER SET utf8mb4 NOT NULL,
+    `Contact` longtext CHARACTER SET utf8mb4 NOT NULL,
+    CONSTRAINT `PK_Vendor` PRIMARY KEY (`Id`)
+) CHARACTER SET=utf8mb4;
+
+CREATE INDEX `IX_Purchases_VendorId` ON `Purchases` (`VendorId`);
+
+ALTER TABLE `Purchases` ADD CONSTRAINT `FK_Purchases_Vendor_VendorId` FOREIGN KEY (`VendorId`) REFERENCES `Vendor` (`Id`) ON DELETE CASCADE;
+
+INSERT INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`)
+VALUES ('20230725132830_Vendor', '7.0.5');
+
+COMMIT;
+
+START TRANSACTION;
+
+DROP PROCEDURE IF EXISTS `POMELO_BEFORE_DROP_PRIMARY_KEY`;
+DELIMITER //
+CREATE PROCEDURE `POMELO_BEFORE_DROP_PRIMARY_KEY`(IN `SCHEMA_NAME_ARGUMENT` VARCHAR(255), IN `TABLE_NAME_ARGUMENT` VARCHAR(255))
+BEGIN
+	DECLARE HAS_AUTO_INCREMENT_ID TINYINT(1);
+	DECLARE PRIMARY_KEY_COLUMN_NAME VARCHAR(255);
+	DECLARE PRIMARY_KEY_TYPE VARCHAR(255);
+	DECLARE SQL_EXP VARCHAR(1000);
+	SELECT COUNT(*)
+		INTO HAS_AUTO_INCREMENT_ID
+		FROM `information_schema`.`COLUMNS`
+		WHERE `TABLE_SCHEMA` = (SELECT IFNULL(SCHEMA_NAME_ARGUMENT, SCHEMA()))
+			AND `TABLE_NAME` = TABLE_NAME_ARGUMENT
+			AND `Extra` = 'auto_increment'
+			AND `COLUMN_KEY` = 'PRI'
+			LIMIT 1;
+	IF HAS_AUTO_INCREMENT_ID THEN
+		SELECT `COLUMN_TYPE`
+			INTO PRIMARY_KEY_TYPE
+			FROM `information_schema`.`COLUMNS`
+			WHERE `TABLE_SCHEMA` = (SELECT IFNULL(SCHEMA_NAME_ARGUMENT, SCHEMA()))
+				AND `TABLE_NAME` = TABLE_NAME_ARGUMENT
+				AND `COLUMN_KEY` = 'PRI'
+			LIMIT 1;
+		SELECT `COLUMN_NAME`
+			INTO PRIMARY_KEY_COLUMN_NAME
+			FROM `information_schema`.`COLUMNS`
+			WHERE `TABLE_SCHEMA` = (SELECT IFNULL(SCHEMA_NAME_ARGUMENT, SCHEMA()))
+				AND `TABLE_NAME` = TABLE_NAME_ARGUMENT
+				AND `COLUMN_KEY` = 'PRI'
+			LIMIT 1;
+		SET SQL_EXP = CONCAT('ALTER TABLE `', (SELECT IFNULL(SCHEMA_NAME_ARGUMENT, SCHEMA())), '`.`', TABLE_NAME_ARGUMENT, '` MODIFY COLUMN `', PRIMARY_KEY_COLUMN_NAME, '` ', PRIMARY_KEY_TYPE, ' NOT NULL;');
+		SET @SQL_EXP = SQL_EXP;
+		PREPARE SQL_EXP_EXECUTE FROM @SQL_EXP;
+		EXECUTE SQL_EXP_EXECUTE;
+		DEALLOCATE PREPARE SQL_EXP_EXECUTE;
+	END IF;
+END //
+DELIMITER ;
+
+DROP PROCEDURE IF EXISTS `POMELO_AFTER_ADD_PRIMARY_KEY`;
+DELIMITER //
+CREATE PROCEDURE `POMELO_AFTER_ADD_PRIMARY_KEY`(IN `SCHEMA_NAME_ARGUMENT` VARCHAR(255), IN `TABLE_NAME_ARGUMENT` VARCHAR(255), IN `COLUMN_NAME_ARGUMENT` VARCHAR(255))
+BEGIN
+	DECLARE HAS_AUTO_INCREMENT_ID INT(11);
+	DECLARE PRIMARY_KEY_COLUMN_NAME VARCHAR(255);
+	DECLARE PRIMARY_KEY_TYPE VARCHAR(255);
+	DECLARE SQL_EXP VARCHAR(1000);
+	SELECT COUNT(*)
+		INTO HAS_AUTO_INCREMENT_ID
+		FROM `information_schema`.`COLUMNS`
+		WHERE `TABLE_SCHEMA` = (SELECT IFNULL(SCHEMA_NAME_ARGUMENT, SCHEMA()))
+			AND `TABLE_NAME` = TABLE_NAME_ARGUMENT
+			AND `COLUMN_NAME` = COLUMN_NAME_ARGUMENT
+			AND `COLUMN_TYPE` LIKE '%int%'
+			AND `COLUMN_KEY` = 'PRI';
+	IF HAS_AUTO_INCREMENT_ID THEN
+		SELECT `COLUMN_TYPE`
+			INTO PRIMARY_KEY_TYPE
+			FROM `information_schema`.`COLUMNS`
+			WHERE `TABLE_SCHEMA` = (SELECT IFNULL(SCHEMA_NAME_ARGUMENT, SCHEMA()))
+				AND `TABLE_NAME` = TABLE_NAME_ARGUMENT
+				AND `COLUMN_NAME` = COLUMN_NAME_ARGUMENT
+				AND `COLUMN_TYPE` LIKE '%int%'
+				AND `COLUMN_KEY` = 'PRI';
+		SELECT `COLUMN_NAME`
+			INTO PRIMARY_KEY_COLUMN_NAME
+			FROM `information_schema`.`COLUMNS`
+			WHERE `TABLE_SCHEMA` = (SELECT IFNULL(SCHEMA_NAME_ARGUMENT, SCHEMA()))
+				AND `TABLE_NAME` = TABLE_NAME_ARGUMENT
+				AND `COLUMN_NAME` = COLUMN_NAME_ARGUMENT
+				AND `COLUMN_TYPE` LIKE '%int%'
+				AND `COLUMN_KEY` = 'PRI';
+		SET SQL_EXP = CONCAT('ALTER TABLE `', (SELECT IFNULL(SCHEMA_NAME_ARGUMENT, SCHEMA())), '`.`', TABLE_NAME_ARGUMENT, '` MODIFY COLUMN `', PRIMARY_KEY_COLUMN_NAME, '` ', PRIMARY_KEY_TYPE, ' NOT NULL AUTO_INCREMENT;');
+		SET @SQL_EXP = SQL_EXP;
+		PREPARE SQL_EXP_EXECUTE FROM @SQL_EXP;
+		EXECUTE SQL_EXP_EXECUTE;
+		DEALLOCATE PREPARE SQL_EXP_EXECUTE;
+	END IF;
+END //
+DELIMITER ;
+
+ALTER TABLE `Purchases` DROP FOREIGN KEY `FK_Purchases_Vendor_VendorId`;
+
+CALL POMELO_BEFORE_DROP_PRIMARY_KEY(NULL, 'Vendor');
+ALTER TABLE `Vendor` DROP PRIMARY KEY;
+
+ALTER TABLE `Vendor` RENAME `Vendors`;
+
+ALTER TABLE `Vendors` ADD CONSTRAINT `PK_Vendors` PRIMARY KEY (`Id`);
+CALL POMELO_AFTER_ADD_PRIMARY_KEY(NULL, 'Vendors', 'Id');
+
+ALTER TABLE `Purchases` ADD CONSTRAINT `FK_Purchases_Vendors_VendorId` FOREIGN KEY (`VendorId`) REFERENCES `Vendors` (`Id`) ON DELETE CASCADE;
+
+INSERT INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`)
+VALUES ('20230725140549_RenameVendortoVendors', '7.0.5');
+
+DROP PROCEDURE `POMELO_BEFORE_DROP_PRIMARY_KEY`;
+
+DROP PROCEDURE `POMELO_AFTER_ADD_PRIMARY_KEY`;
+
+COMMIT;
+
+START TRANSACTION;
+
+ALTER TABLE `Vendors` ADD `IsDeleted` tinyint(1) NOT NULL DEFAULT FALSE;
+
+INSERT INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`)
+VALUES ('20230725150307_VendorIsDeleted', '7.0.5');
+
+COMMIT;
+
+START TRANSACTION;
+
+ALTER TABLE `PurchaseOrders` ADD `Quantity` int NOT NULL DEFAULT 0;
+
+INSERT INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`)
+VALUES ('20230726125044_PurchaseOrderQuantity', '7.0.5');
+
+COMMIT;
+
+START TRANSACTION;
+
+CREATE INDEX `IX_PurchaseOrders_ProductId` ON `PurchaseOrders` (`ProductId`);
+
+ALTER TABLE `PurchaseOrders` ADD CONSTRAINT `FK_PurchaseOrders_Products_ProductId` FOREIGN KEY (`ProductId`) REFERENCES `Products` (`Id`) ON DELETE CASCADE;
+
+INSERT INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`)
+VALUES ('20230727153638_PurchaseOrderProductConstraint', '7.0.5');
+
+COMMIT;
+
+START TRANSACTION;
+
+ALTER TABLE `StockLocation` DROP FOREIGN KEY `FK_StockLocation_Locations_LocationId`;
+
+ALTER TABLE `StockLocation` MODIFY COLUMN `LocationId` bigint NULL;
+
+ALTER TABLE `StockLocation` ADD CONSTRAINT `FK_StockLocation_Locations_LocationId` FOREIGN KEY (`LocationId`) REFERENCES `Locations` (`Id`);
+
+INSERT INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`)
+VALUES ('20230730151809_StockLocationNullable', '7.0.5');
+
+COMMIT;
+
+START TRANSACTION;
+
+ALTER TABLE `PurchaseOrders` MODIFY COLUMN `Cost` decimal(65,30) NOT NULL;
+
+ALTER TABLE `Products` MODIFY COLUMN `Price` decimal(65,30) NOT NULL;
+
+ALTER TABLE `Products` MODIFY COLUMN `Cost` decimal(65,30) NOT NULL;
+
+ALTER TABLE `Products` ADD `CategoryId` bigint NULL;
+
+CREATE TABLE `ProductCategories` (
+    `Id` bigint NOT NULL AUTO_INCREMENT,
+    `Name` longtext CHARACTER SET utf8mb4 NOT NULL,
+    `Description` longtext CHARACTER SET utf8mb4 NULL,
+    `ProductCategoryId` bigint NULL,
+    CONSTRAINT `PK_ProductCategories` PRIMARY KEY (`Id`),
+    CONSTRAINT `FK_ProductCategories_ProductCategories_ProductCategoryId` FOREIGN KEY (`ProductCategoryId`) REFERENCES `ProductCategories` (`Id`)
+) CHARACTER SET=utf8mb4;
+
+CREATE INDEX `IX_Products_CategoryId` ON `Products` (`CategoryId`);
+
+CREATE INDEX `IX_ProductCategories_ProductCategoryId` ON `ProductCategories` (`ProductCategoryId`);
+
+ALTER TABLE `Products` ADD CONSTRAINT `FK_Products_ProductCategories_CategoryId` FOREIGN KEY (`CategoryId`) REFERENCES `ProductCategories` (`Id`);
+
+INSERT INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`)
+VALUES ('20230915130118_Categories', '7.0.5');
+
+COMMIT;
+
+START TRANSACTION;
+
+ALTER TABLE `Products` ADD `Deleted` tinyint(1) NOT NULL DEFAULT FALSE;
+
+INSERT INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`)
+VALUES ('20230916123855_ProductDeleteable', '7.0.5');
+
+COMMIT;
+
+START TRANSACTION;
+
+CREATE TABLE `Customers` (
+    `Id` bigint NOT NULL AUTO_INCREMENT,
+    `Name` longtext CHARACTER SET utf8mb4 NOT NULL,
+    `Address` longtext CHARACTER SET utf8mb4 NOT NULL,
+    `Phone` longtext CHARACTER SET utf8mb4 NOT NULL,
+    CONSTRAINT `PK_Customers` PRIMARY KEY (`Id`)
+) CHARACTER SET=utf8mb4;
+
+CREATE TABLE `CustomerPrice` (
+    `Id` bigint NOT NULL AUTO_INCREMENT,
+    `MinQty` int NOT NULL,
+    `Price` decimal(65,30) NOT NULL,
+    `CustomerId` bigint NOT NULL,
+    `ProductId` bigint NOT NULL,
+    CONSTRAINT `PK_CustomerPrice` PRIMARY KEY (`Id`),
+    CONSTRAINT `FK_CustomerPrice_Customers_CustomerId` FOREIGN KEY (`CustomerId`) REFERENCES `Customers` (`Id`) ON DELETE CASCADE,
+    CONSTRAINT `FK_CustomerPrice_Products_ProductId` FOREIGN KEY (`ProductId`) REFERENCES `Products` (`Id`) ON DELETE CASCADE
+) CHARACTER SET=utf8mb4;
+
+CREATE INDEX `IX_CustomerPrice_CustomerId` ON `CustomerPrice` (`CustomerId`);
+
+CREATE INDEX `IX_CustomerPrice_ProductId` ON `CustomerPrice` (`ProductId`);
+
+INSERT INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`)
+VALUES ('20230916140612_Customer', '7.0.5');
+
+COMMIT;
+
+START TRANSACTION;
+
+ALTER TABLE `Customers` ADD `IsDeleted` tinyint(1) NOT NULL DEFAULT FALSE;
+
+INSERT INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`)
+VALUES ('20230916144707_CustomerDelete', '7.0.5');
+
+COMMIT;
+
+START TRANSACTION;
+
+ALTER TABLE `POSSession` RENAME COLUMN `StartedAt` TO `OpenedAt`;
+
+ALTER TABLE `POSSession` RENAME COLUMN `Note` TO `ClosingRemark`;
+
+ALTER TABLE `POSSession` MODIFY COLUMN `ClosedAt` datetime(6) NULL;
+
+ALTER TABLE `POSSession` ADD `ClosingBalance` decimal(65,30) NOT NULL DEFAULT 0.0;
+
+ALTER TABLE `POSSession` ADD `OpeningBalance` decimal(65,30) NOT NULL DEFAULT 0.0;
+
+CREATE TABLE `Order` (
+    `Id` bigint NOT NULL AUTO_INCREMENT,
+    `CreatedAt` datetime(6) NOT NULL,
+    `UserId` bigint NOT NULL,
+    `CustomerId` bigint NULL,
+    `POSSessionId` bigint NOT NULL,
+    CONSTRAINT `PK_Order` PRIMARY KEY (`Id`),
+    CONSTRAINT `FK_Order_Customers_CustomerId` FOREIGN KEY (`CustomerId`) REFERENCES `Customers` (`Id`),
+    CONSTRAINT `FK_Order_POSSession_POSSessionId` FOREIGN KEY (`POSSessionId`) REFERENCES `POSSession` (`Id`) ON DELETE CASCADE,
+    CONSTRAINT `FK_Order_Users_UserId` FOREIGN KEY (`UserId`) REFERENCES `Users` (`Id`) ON DELETE CASCADE
+) CHARACTER SET=utf8mb4;
+
+CREATE TABLE `PointOfSaleUser` (
+    `AssignedPOSesId` bigint NOT NULL,
+    `AssignedUsersId` bigint NOT NULL,
+    CONSTRAINT `PK_PointOfSaleUser` PRIMARY KEY (`AssignedPOSesId`, `AssignedUsersId`),
+    CONSTRAINT `FK_PointOfSaleUser_PointOfSale_AssignedPOSesId` FOREIGN KEY (`AssignedPOSesId`) REFERENCES `PointOfSale` (`Id`) ON DELETE CASCADE,
+    CONSTRAINT `FK_PointOfSaleUser_Users_AssignedUsersId` FOREIGN KEY (`AssignedUsersId`) REFERENCES `Users` (`Id`) ON DELETE CASCADE
+) CHARACTER SET=utf8mb4;
+
+CREATE TABLE `OrderItem` (
+    `Id` bigint NOT NULL AUTO_INCREMENT,
+    `Qty` int NOT NULL,
+    `Price` decimal(65,30) NOT NULL,
+    `Cost` decimal(65,30) NOT NULL,
+    `ProductId` bigint NOT NULL,
+    `OrderId` bigint NOT NULL,
+    CONSTRAINT `PK_OrderItem` PRIMARY KEY (`Id`),
+    CONSTRAINT `FK_OrderItem_Order_OrderId` FOREIGN KEY (`OrderId`) REFERENCES `Order` (`Id`) ON DELETE CASCADE,
+    CONSTRAINT `FK_OrderItem_Products_ProductId` FOREIGN KEY (`ProductId`) REFERENCES `Products` (`Id`) ON DELETE CASCADE
+) CHARACTER SET=utf8mb4;
+
+CREATE INDEX `IX_Order_CustomerId` ON `Order` (`CustomerId`);
+
+CREATE INDEX `IX_Order_POSSessionId` ON `Order` (`POSSessionId`);
+
+CREATE INDEX `IX_Order_UserId` ON `Order` (`UserId`);
+
+CREATE INDEX `IX_OrderItem_OrderId` ON `OrderItem` (`OrderId`);
+
+CREATE INDEX `IX_OrderItem_ProductId` ON `OrderItem` (`ProductId`);
+
+CREATE INDEX `IX_PointOfSaleUser_AssignedUsersId` ON `PointOfSaleUser` (`AssignedUsersId`);
+
+INSERT INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`)
+VALUES ('20230917124816_PointOfSales', '7.0.5');
+
+COMMIT;
+
+START TRANSACTION;
+
+DROP PROCEDURE IF EXISTS `POMELO_BEFORE_DROP_PRIMARY_KEY`;
+DELIMITER //
+CREATE PROCEDURE `POMELO_BEFORE_DROP_PRIMARY_KEY`(IN `SCHEMA_NAME_ARGUMENT` VARCHAR(255), IN `TABLE_NAME_ARGUMENT` VARCHAR(255))
+BEGIN
+	DECLARE HAS_AUTO_INCREMENT_ID TINYINT(1);
+	DECLARE PRIMARY_KEY_COLUMN_NAME VARCHAR(255);
+	DECLARE PRIMARY_KEY_TYPE VARCHAR(255);
+	DECLARE SQL_EXP VARCHAR(1000);
+	SELECT COUNT(*)
+		INTO HAS_AUTO_INCREMENT_ID
+		FROM `information_schema`.`COLUMNS`
+		WHERE `TABLE_SCHEMA` = (SELECT IFNULL(SCHEMA_NAME_ARGUMENT, SCHEMA()))
+			AND `TABLE_NAME` = TABLE_NAME_ARGUMENT
+			AND `Extra` = 'auto_increment'
+			AND `COLUMN_KEY` = 'PRI'
+			LIMIT 1;
+	IF HAS_AUTO_INCREMENT_ID THEN
+		SELECT `COLUMN_TYPE`
+			INTO PRIMARY_KEY_TYPE
+			FROM `information_schema`.`COLUMNS`
+			WHERE `TABLE_SCHEMA` = (SELECT IFNULL(SCHEMA_NAME_ARGUMENT, SCHEMA()))
+				AND `TABLE_NAME` = TABLE_NAME_ARGUMENT
+				AND `COLUMN_KEY` = 'PRI'
+			LIMIT 1;
+		SELECT `COLUMN_NAME`
+			INTO PRIMARY_KEY_COLUMN_NAME
+			FROM `information_schema`.`COLUMNS`
+			WHERE `TABLE_SCHEMA` = (SELECT IFNULL(SCHEMA_NAME_ARGUMENT, SCHEMA()))
+				AND `TABLE_NAME` = TABLE_NAME_ARGUMENT
+				AND `COLUMN_KEY` = 'PRI'
+			LIMIT 1;
+		SET SQL_EXP = CONCAT('ALTER TABLE `', (SELECT IFNULL(SCHEMA_NAME_ARGUMENT, SCHEMA())), '`.`', TABLE_NAME_ARGUMENT, '` MODIFY COLUMN `', PRIMARY_KEY_COLUMN_NAME, '` ', PRIMARY_KEY_TYPE, ' NOT NULL;');
+		SET @SQL_EXP = SQL_EXP;
+		PREPARE SQL_EXP_EXECUTE FROM @SQL_EXP;
+		EXECUTE SQL_EXP_EXECUTE;
+		DEALLOCATE PREPARE SQL_EXP_EXECUTE;
+	END IF;
+END //
+DELIMITER ;
+
+DROP PROCEDURE IF EXISTS `POMELO_AFTER_ADD_PRIMARY_KEY`;
+DELIMITER //
+CREATE PROCEDURE `POMELO_AFTER_ADD_PRIMARY_KEY`(IN `SCHEMA_NAME_ARGUMENT` VARCHAR(255), IN `TABLE_NAME_ARGUMENT` VARCHAR(255), IN `COLUMN_NAME_ARGUMENT` VARCHAR(255))
+BEGIN
+	DECLARE HAS_AUTO_INCREMENT_ID INT(11);
+	DECLARE PRIMARY_KEY_COLUMN_NAME VARCHAR(255);
+	DECLARE PRIMARY_KEY_TYPE VARCHAR(255);
+	DECLARE SQL_EXP VARCHAR(1000);
+	SELECT COUNT(*)
+		INTO HAS_AUTO_INCREMENT_ID
+		FROM `information_schema`.`COLUMNS`
+		WHERE `TABLE_SCHEMA` = (SELECT IFNULL(SCHEMA_NAME_ARGUMENT, SCHEMA()))
+			AND `TABLE_NAME` = TABLE_NAME_ARGUMENT
+			AND `COLUMN_NAME` = COLUMN_NAME_ARGUMENT
+			AND `COLUMN_TYPE` LIKE '%int%'
+			AND `COLUMN_KEY` = 'PRI';
+	IF HAS_AUTO_INCREMENT_ID THEN
+		SELECT `COLUMN_TYPE`
+			INTO PRIMARY_KEY_TYPE
+			FROM `information_schema`.`COLUMNS`
+			WHERE `TABLE_SCHEMA` = (SELECT IFNULL(SCHEMA_NAME_ARGUMENT, SCHEMA()))
+				AND `TABLE_NAME` = TABLE_NAME_ARGUMENT
+				AND `COLUMN_NAME` = COLUMN_NAME_ARGUMENT
+				AND `COLUMN_TYPE` LIKE '%int%'
+				AND `COLUMN_KEY` = 'PRI';
+		SELECT `COLUMN_NAME`
+			INTO PRIMARY_KEY_COLUMN_NAME
+			FROM `information_schema`.`COLUMNS`
+			WHERE `TABLE_SCHEMA` = (SELECT IFNULL(SCHEMA_NAME_ARGUMENT, SCHEMA()))
+				AND `TABLE_NAME` = TABLE_NAME_ARGUMENT
+				AND `COLUMN_NAME` = COLUMN_NAME_ARGUMENT
+				AND `COLUMN_TYPE` LIKE '%int%'
+				AND `COLUMN_KEY` = 'PRI';
+		SET SQL_EXP = CONCAT('ALTER TABLE `', (SELECT IFNULL(SCHEMA_NAME_ARGUMENT, SCHEMA())), '`.`', TABLE_NAME_ARGUMENT, '` MODIFY COLUMN `', PRIMARY_KEY_COLUMN_NAME, '` ', PRIMARY_KEY_TYPE, ' NOT NULL AUTO_INCREMENT;');
+		SET @SQL_EXP = SQL_EXP;
+		PREPARE SQL_EXP_EXECUTE FROM @SQL_EXP;
+		EXECUTE SQL_EXP_EXECUTE;
+		DEALLOCATE PREPARE SQL_EXP_EXECUTE;
+	END IF;
+END //
+DELIMITER ;
+
+ALTER TABLE `Order` DROP FOREIGN KEY `FK_Order_Customers_CustomerId`;
+
+ALTER TABLE `Order` DROP FOREIGN KEY `FK_Order_POSSession_POSSessionId`;
+
+ALTER TABLE `Order` DROP FOREIGN KEY `FK_Order_Users_UserId`;
+
+ALTER TABLE `OrderItem` DROP FOREIGN KEY `FK_OrderItem_Order_OrderId`;
+
+ALTER TABLE `OrderItem` DROP FOREIGN KEY `FK_OrderItem_Products_ProductId`;
+
+CALL POMELO_BEFORE_DROP_PRIMARY_KEY(NULL, 'OrderItem');
+ALTER TABLE `OrderItem` DROP PRIMARY KEY;
+
+CALL POMELO_BEFORE_DROP_PRIMARY_KEY(NULL, 'Order');
+ALTER TABLE `Order` DROP PRIMARY KEY;
+
+ALTER TABLE `OrderItem` RENAME `OrdersItem`;
+
+ALTER TABLE `Order` RENAME `Orders`;
+
+ALTER TABLE `OrdersItem` DROP INDEX `IX_OrderItem_ProductId`;
+
+CREATE INDEX `IX_OrdersItem_ProductId` ON `OrdersItem` (`ProductId`);
+
+ALTER TABLE `OrdersItem` DROP INDEX `IX_OrderItem_OrderId`;
+
+CREATE INDEX `IX_OrdersItem_OrderId` ON `OrdersItem` (`OrderId`);
+
+ALTER TABLE `Orders` DROP INDEX `IX_Order_UserId`;
+
+CREATE INDEX `IX_Orders_UserId` ON `Orders` (`UserId`);
+
+ALTER TABLE `Orders` DROP INDEX `IX_Order_POSSessionId`;
+
+CREATE INDEX `IX_Orders_POSSessionId` ON `Orders` (`POSSessionId`);
+
+ALTER TABLE `Orders` DROP INDEX `IX_Order_CustomerId`;
+
+CREATE INDEX `IX_Orders_CustomerId` ON `Orders` (`CustomerId`);
+
+ALTER TABLE `OrdersItem` ADD CONSTRAINT `PK_OrdersItem` PRIMARY KEY (`Id`);
+CALL POMELO_AFTER_ADD_PRIMARY_KEY(NULL, 'OrdersItem', 'Id');
+
+ALTER TABLE `Orders` ADD CONSTRAINT `PK_Orders` PRIMARY KEY (`Id`);
+CALL POMELO_AFTER_ADD_PRIMARY_KEY(NULL, 'Orders', 'Id');
+
+ALTER TABLE `Orders` ADD CONSTRAINT `FK_Orders_Customers_CustomerId` FOREIGN KEY (`CustomerId`) REFERENCES `Customers` (`Id`);
+
+ALTER TABLE `Orders` ADD CONSTRAINT `FK_Orders_POSSession_POSSessionId` FOREIGN KEY (`POSSessionId`) REFERENCES `POSSession` (`Id`) ON DELETE CASCADE;
+
+ALTER TABLE `Orders` ADD CONSTRAINT `FK_Orders_Users_UserId` FOREIGN KEY (`UserId`) REFERENCES `Users` (`Id`) ON DELETE CASCADE;
+
+ALTER TABLE `OrdersItem` ADD CONSTRAINT `FK_OrdersItem_Orders_OrderId` FOREIGN KEY (`OrderId`) REFERENCES `Orders` (`Id`) ON DELETE CASCADE;
+
+ALTER TABLE `OrdersItem` ADD CONSTRAINT `FK_OrdersItem_Products_ProductId` FOREIGN KEY (`ProductId`) REFERENCES `Products` (`Id`) ON DELETE CASCADE;
+
+INSERT INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`)
+VALUES ('20230917125031_Order', '7.0.5');
+
+DROP PROCEDURE `POMELO_BEFORE_DROP_PRIMARY_KEY`;
+
+DROP PROCEDURE `POMELO_AFTER_ADD_PRIMARY_KEY`;
+
+COMMIT;
+
+START TRANSACTION;
+
+ALTER TABLE `Users` MODIFY COLUMN `Username` varchar(255) CHARACTER SET utf8mb4 NOT NULL;
+
+CREATE UNIQUE INDEX `IX_Users_Username` ON `Users` (`Username`);
+
+INSERT INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`)
+VALUES ('20230917130005_UsernameUnique', '7.0.5');
+
+COMMIT;
+
+START TRANSACTION;
+
+ALTER TABLE `Users` ADD `IsDeleted` tinyint(1) NOT NULL DEFAULT FALSE;
+
+ALTER TABLE `PointOfSale` ADD `IsDeleted` tinyint(1) NOT NULL DEFAULT FALSE;
+
+INSERT INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`)
+VALUES ('20230917133542_isDeleted', '7.0.5');
+
+COMMIT;
+
+START TRANSACTION;
+
+CREATE TABLE `Claims` (
+    `Id` bigint NOT NULL AUTO_INCREMENT,
+    `Name` varchar(255) CHARACTER SET utf8mb4 NOT NULL,
+    CONSTRAINT `PK_Claims` PRIMARY KEY (`Id`)
+) CHARACTER SET=utf8mb4;
+
+CREATE TABLE `ClaimUser` (
+    `ClaimsId` bigint NOT NULL,
+    `UsersId` bigint NOT NULL,
+    CONSTRAINT `PK_ClaimUser` PRIMARY KEY (`ClaimsId`, `UsersId`),
+    CONSTRAINT `FK_ClaimUser_Claims_ClaimsId` FOREIGN KEY (`ClaimsId`) REFERENCES `Claims` (`Id`) ON DELETE CASCADE,
+    CONSTRAINT `FK_ClaimUser_Users_UsersId` FOREIGN KEY (`UsersId`) REFERENCES `Users` (`Id`) ON DELETE CASCADE
+) CHARACTER SET=utf8mb4;
+
+CREATE UNIQUE INDEX `IX_Claims_Name` ON `Claims` (`Name`);
+
+CREATE INDEX `IX_ClaimUser_UsersId` ON `ClaimUser` (`UsersId`);
+
+INSERT INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`)
+VALUES ('20230920145740_UserClaims', '7.0.5');
+
+COMMIT;
+
+START TRANSACTION;
+
+INSERT INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`)
+VALUES ('20230925141135_productCategoryId', '7.0.5');
+
+COMMIT;
+
+START TRANSACTION;
+
+ALTER TABLE `PurchaseOrders` ADD `Description` longtext CHARACTER SET utf8mb4 NOT NULL;
+
+CREATE TABLE `LandedCosts` (
+    `Id` bigint NOT NULL AUTO_INCREMENT,
+    `Biller` longtext CHARACTER SET utf8mb4 NOT NULL,
+    `IsDelivered` tinyint(1) NOT NULL,
+    CONSTRAINT `PK_LandedCosts` PRIMARY KEY (`Id`)
+) CHARACTER SET=utf8mb4;
+
+CREATE TABLE `LandedCostItems` (
+    `Id` bigint NOT NULL AUTO_INCREMENT,
+    `Qty` int NOT NULL,
+    `Cost` decimal(65,30) NOT NULL,
+    `PurchaseOrderId` bigint NOT NULL,
+    `LandedCostId` bigint NULL,
+    `LandedCostItemId` bigint NULL,
+    CONSTRAINT `PK_LandedCostItems` PRIMARY KEY (`Id`),
+    CONSTRAINT `FK_LandedCostItems_LandedCostItems_LandedCostItemId` FOREIGN KEY (`LandedCostItemId`) REFERENCES `LandedCostItems` (`Id`),
+    CONSTRAINT `FK_LandedCostItems_LandedCosts_LandedCostId` FOREIGN KEY (`LandedCostId`) REFERENCES `LandedCosts` (`Id`),
+    CONSTRAINT `FK_LandedCostItems_PurchaseOrders_PurchaseOrderId` FOREIGN KEY (`PurchaseOrderId`) REFERENCES `PurchaseOrders` (`Id`) ON DELETE CASCADE
+) CHARACTER SET=utf8mb4;
+
+CREATE INDEX `IX_LandedCostItems_LandedCostId` ON `LandedCostItems` (`LandedCostId`);
+
+CREATE INDEX `IX_LandedCostItems_LandedCostItemId` ON `LandedCostItems` (`LandedCostItemId`);
+
+CREATE INDEX `IX_LandedCostItems_PurchaseOrderId` ON `LandedCostItems` (`PurchaseOrderId`);
+
+INSERT INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`)
+VALUES ('20231001083823_LandedCost', '7.0.5');
+
+COMMIT;
+
+START TRANSACTION;
+
+ALTER TABLE `LandedCosts` ADD `IsPurchase` tinyint(1) NOT NULL DEFAULT FALSE;
+
+ALTER TABLE `LandedCosts` ADD `SourceLocationId` bigint NULL;
+
+ALTER TABLE `LandedCosts` ADD `TargetLocationId` bigint NULL;
+
+CREATE INDEX `IX_LandedCosts_SourceLocationId` ON `LandedCosts` (`SourceLocationId`);
+
+CREATE INDEX `IX_LandedCosts_TargetLocationId` ON `LandedCosts` (`TargetLocationId`);
+
+ALTER TABLE `LandedCosts` ADD CONSTRAINT `FK_LandedCosts_Locations_SourceLocationId` FOREIGN KEY (`SourceLocationId`) REFERENCES `Locations` (`Id`);
+
+ALTER TABLE `LandedCosts` ADD CONSTRAINT `FK_LandedCosts_Locations_TargetLocationId` FOREIGN KEY (`TargetLocationId`) REFERENCES `Locations` (`Id`);
+
+INSERT INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`)
+VALUES ('20231001093230_TargetSourceLocation', '7.0.5');
+
+COMMIT;
+
+START TRANSACTION;
+
+INSERT INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`)
+VALUES ('20231001122602_NullableLoc', '7.0.5');
+
+COMMIT;
+
+START TRANSACTION;
+
+ALTER TABLE `LandedCosts` ADD `Date` date NOT NULL DEFAULT '0001-01-01';
+
+INSERT INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`)
+VALUES ('20231001123840_LandedCostDate', '7.0.5');
+
+COMMIT;
+
+START TRANSACTION;
+
+ALTER TABLE `LandedCosts` ADD `DeliveredAt` date NULL;
+
+INSERT INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`)
+VALUES ('20231002053229_DeliveredAtLandedCost', '7.0.5');
+
+COMMIT;
+
+START TRANSACTION;
+
+ALTER TABLE `LandedCostItems` DROP FOREIGN KEY `FK_LandedCostItems_PurchaseOrders_PurchaseOrderId`;
+
+ALTER TABLE `LandedCostItems` MODIFY COLUMN `PurchaseOrderId` bigint NULL;
+
+ALTER TABLE `LandedCostItems` ADD CONSTRAINT `FK_LandedCostItems_PurchaseOrders_PurchaseOrderId` FOREIGN KEY (`PurchaseOrderId`) REFERENCES `PurchaseOrders` (`Id`);
+
+INSERT INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`)
+VALUES ('20231003090524_ParentLandedCostItem', '7.0.5');
+
+COMMIT;
+
+START TRANSACTION;
+
+ALTER TABLE `ProductCategories` ADD `MinQty` int NOT NULL DEFAULT 0;
+
+INSERT INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`)
+VALUES ('20231004065913_Replenishment', '7.0.5');
+
+COMMIT;
+
