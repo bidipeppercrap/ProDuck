@@ -2,11 +2,14 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using ProDuck.DTO;
 using ProDuck.Models;
 using ProDuck.QueryParams;
 using ProDuck.Responses;
 using ProDuck.Types;
+using System.Linq;
+using System.Linq.Expressions;
 
 namespace ProDuck.Controllers
 {
@@ -22,6 +25,26 @@ namespace ProDuck.Controllers
         {
             _context = context;
         }
+
+        private static string GetCategoryAddress(ProductCategory category, string parentNames)
+        {
+            string result = category.ParentCategory != null ? GetCategoryAddress(category.ParentCategory, category.ParentCategory.Name) + " > " + parentNames : parentNames;
+
+            return result;
+        }
+
+        private static ProductCategoryDTO CategoryToProjection(ProductCategory category) =>
+            new()
+            {
+                Id = category.Id,
+                Name = category.ParentCategory != null ? GetCategoryAddress(category.ParentCategory, category.ParentCategory.Name) + " > " + category.Name : category.Name,
+                Description = category.Description,
+                ProductCategoryId = category.ProductCategoryId,
+                ProductsCount = category.Products.Count,
+                ChildCategoriesCount = category.ChildCategories.Count,
+                MinQty = category.MinQty,
+                TotalStock = category.Products.Sum(xx => xx.Stocks.Sum(s => s.Stock))
+            };
 
         private static ProductCategoryDTO CategoryToDTO(ProductCategory category) =>
             new()
@@ -75,9 +98,10 @@ namespace ProDuck.Controllers
         public async Task<PaginatedResponse> GetReplenishment([FromQuery] PaginationParams qp)
         {
             var categories = await _context.ProductCategories
+                .Include(x => x.ParentCategory)
                 .Include(x => x.Products).ThenInclude(xx => xx.Stocks)
                 .Where(x => x.MinQty >= x.Products.Sum(xx => xx.Stocks.Sum(s => s.Stock)))
-                .Select(x => CategoryToDTO(x))
+                .Select(x => CategoryToProjection(x))
                 .ToPagedListAsync(qp.Page, qp.PageSize);
 
             return new PaginatedResponse(categories, new Pagination

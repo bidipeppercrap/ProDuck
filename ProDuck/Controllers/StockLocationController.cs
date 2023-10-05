@@ -7,9 +7,6 @@ using ProDuck.Models;
 using ProDuck.QueryParams;
 using ProDuck.Responses;
 using ProDuck.Types;
-using System.Text.Json.Serialization;
-using static Microsoft.Extensions.Logging.EventSource.LoggingEventSource;
-using static ProDuck.Controllers.ProductsController;
 
 namespace ProDuck.Controllers
 {
@@ -57,7 +54,7 @@ namespace ProDuck.Controllers
         public async Task<PaginatedResponse> GetProductStocks(long id, [FromQuery] PaginationParams qp, [FromQuery] string keyword = "")
         {
             var whereQuery = _context.StockLocation
-                .Include(x => x.Location)
+                .Include(x => x.Location).ThenInclude(xx => xx!.ParentLocation)
                 .Where(x => x.ProductId == id);
 
             var words = keyword.Trim().Split(" ");
@@ -72,7 +69,7 @@ namespace ProDuck.Controllers
             var result = await whereQuery
                 .OrderBy(x => x.Location)
                 .ThenBy(x => x.Stock)
-                .Select(x => LocationStockToDTO(x))
+                .Select(x => LocationStockToDTOFullName(x))
                 .ToPagedListAsync(qp.Page, qp.PageSize);
 
             return new PaginatedResponse(result, new Pagination
@@ -173,6 +170,26 @@ namespace ProDuck.Controllers
             {
                 Id = stock.Location.Id,
                 Name = stock.Location.Name,
+            } : null;
+
+            return new LocationStockDTO
+            {
+                Id = stock.Id,
+                Stock = stock.Stock,
+                Location = location
+            };
+        }
+
+        private static string GetLocationAddress(Location location)
+        {
+            return location.ParentLocation == null ? location.Name : GetLocationAddress(location.ParentLocation) + " > " + location.Name;
+        }
+        private static LocationStockDTO LocationStockToDTOFullName(StockLocation stock)
+        {
+            var location = stock.Location != null ? new LocationStockDTOLocation
+            {
+                Id = stock.Location.Id,
+                Name = GetLocationAddress(stock.Location),
             } : null;
 
             return new LocationStockDTO
