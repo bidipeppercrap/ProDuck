@@ -83,6 +83,108 @@ namespace ProDuck.Controllers
             });
         }
 
+        public class CreateAllFromPurchaseDTO
+        {
+            public long PurchaseId { get; set; }
+            public long LandedCostId { get; set; }
+        }
+
+        [HttpPost("bulk")]
+        public async Task<IActionResult> CreateAllBulk([FromBody] CreateAllFromPurchaseDTO dto)
+        {
+            using var transaction = _context.Database.BeginTransaction();
+
+            try
+            {
+                var bulkItem = new LandedCostItem
+                {
+                    Qty = 0,
+                    Cost = 0,
+                    LandedCostId = dto.LandedCostId
+                };
+
+                _context.LandedCostItems.Add(bulkItem);
+                await _context.SaveChangesAsync();
+
+                var orders = await _context.PurchaseOrders
+                    .Include(x => x.Product)
+                    .Include(x => x.LandedCostItems).ThenInclude(xx => xx.LandedCost)
+                    .Include(x => x.LandedCostItems).ThenInclude(xx => xx.Parent).ThenInclude(xxx => xxx!.LandedCost)
+                    .Where(x => x.PurchaseId.Equals(dto.PurchaseId))
+                    .Select(x => PurchaseOrdersController.OrderToDTO(x))
+                    .ToListAsync();
+
+                var itemsToAdd = new List<LandedCostItem> { };
+
+                foreach (var order in orders)
+                {
+                    var item = new LandedCostItem
+                    {
+                        Qty = order.Quantity - order.Delivered,
+                        Cost = 0,
+                        LandedCostItemId = bulkItem.Id,
+                        PurchaseOrderId = order.Id
+                    };
+
+                    itemsToAdd.Add(item);
+                }
+
+                _context.LandedCostItems.AddRange(itemsToAdd);
+                await _context.SaveChangesAsync();
+
+                await transaction.CommitAsync();
+            }
+            catch (Exception)
+            {
+                throw new ApiException("Internal Error");
+            }
+
+            return NoContent();
+        }
+
+        [HttpPost("separated")]
+        public async Task<IActionResult> CreateAllSeparated([FromBody] CreateAllFromPurchaseDTO dto)
+        {
+            using var transaction = _context.Database.BeginTransaction();
+
+            try
+            {
+                var orders = await _context.PurchaseOrders
+                    .Include(x => x.Product)
+                    .Include(x => x.LandedCostItems).ThenInclude(xx => xx.LandedCost)
+                    .Include(x => x.LandedCostItems).ThenInclude(xx => xx.Parent).ThenInclude(xxx => xxx!.LandedCost)
+                    .Where(x => x.PurchaseId.Equals(dto.PurchaseId))
+                    .Select(x => PurchaseOrdersController.OrderToDTO(x))
+                    .ToListAsync();
+
+                var itemsToAdd = new List<LandedCostItem> { };
+
+                foreach (var order in orders)
+                {
+                    var item = new LandedCostItem
+                    {
+                        Qty = order.Quantity - order.Delivered,
+                        Cost = 0,
+                        LandedCostId = dto.LandedCostId,
+                        PurchaseOrderId = order.Id
+                    };
+
+                    itemsToAdd.Add(item);
+                }
+
+                _context.LandedCostItems.AddRange(itemsToAdd);
+                await _context.SaveChangesAsync();
+
+                await transaction.CommitAsync();
+            }
+            catch (Exception)
+            {
+                throw new ApiException("Internal Error");
+            }
+
+            return NoContent();
+        }
+
         [HttpPost]
         public async Task<IActionResult> Post([FromBody] LandedCostItemCreateDTO dto)
         {

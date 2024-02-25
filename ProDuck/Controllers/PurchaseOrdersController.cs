@@ -21,7 +21,7 @@ namespace ProDuck.Controllers
             _context = context;
         }
 
-        private static PurchaseOrderDTO OrderToDTO(PurchaseOrder order)
+        public static PurchaseOrderDTO OrderToDTO(PurchaseOrder order)
         {
             var dto = new PurchaseOrderDTO
             {
