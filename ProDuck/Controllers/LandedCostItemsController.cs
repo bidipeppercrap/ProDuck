@@ -90,7 +90,7 @@ namespace ProDuck.Controllers
         }
 
         [HttpPost("bulk")]
-        public async Task<IActionResult> CreateAllBulk([FromBody] CreateAllFromPurchaseDTO dto)
+        public async Task<IActionResult> CreateAllBulk([FromBody] CreateAllFromPurchaseDTO dto, [FromQuery] bool ignoreDelivered = false)
         {
             using var transaction = _context.Database.BeginTransaction();
 
@@ -120,7 +120,7 @@ namespace ProDuck.Controllers
                 {
                     var item = new LandedCostItem
                     {
-                        Qty = order.Quantity - order.Delivered,
+                        Qty = ignoreDelivered ? order.Quantity : order.Quantity - order.Delivered,
                         Cost = 0,
                         LandedCostItemId = bulkItem.Id,
                         PurchaseOrderId = order.Id
@@ -143,7 +143,7 @@ namespace ProDuck.Controllers
         }
 
         [HttpPost("separated")]
-        public async Task<IActionResult> CreateAllSeparated([FromBody] CreateAllFromPurchaseDTO dto)
+        public async Task<IActionResult> CreateAllSeparated([FromBody] CreateAllFromPurchaseDTO dto, [FromQuery] bool ignoreDelivered = false)
         {
             using var transaction = _context.Database.BeginTransaction();
 
@@ -163,7 +163,7 @@ namespace ProDuck.Controllers
                 {
                     var item = new LandedCostItem
                     {
-                        Qty = order.Quantity - order.Delivered,
+                        Qty = ignoreDelivered ? order.Quantity : order.Quantity - order.Delivered,
                         Cost = 0,
                         LandedCostId = dto.LandedCostId,
                         PurchaseOrderId = order.Id
