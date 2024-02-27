@@ -22,9 +22,14 @@
 
 ## Svelte Apps
 
-### Setup
+### 1. Building
 
-1. pm2 configuration file:
+1. Change `fetchServer` url to `192.168...`
+1. `npm run build`
+1. Change port on `build/index.js` as desired
+
+### 2. PM2 Setup
+1. pm2 `ecosystem.config.js` configuration file:
 
     ```
     module.exports = {
@@ -49,6 +54,7 @@
     }
     ```
 
-1. Change `fetchServer` url to `192.168...`
-1. `npm run build`
-1. Change port on `build/index.js` as desired
+1. `pm2 delete all`
+1. `pm2 startOrReload ecosystem.config.js --update-env`
+1. `pm2 save`
+1. `pm2 startup`
