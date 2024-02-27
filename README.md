@@ -55,6 +55,6 @@
     ```
 
 1. `pm2 delete all`
-1. `pm2 startOrReload ecosystem.config.js --update-env`
+1. `pm2 startOrReload ecosystem.config.js --env production --update-env`
 1. `pm2 save`
 1. `pm2 startup`
