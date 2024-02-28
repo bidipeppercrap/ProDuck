@@ -68,7 +68,7 @@ namespace ProDuck.Controllers
 
             if (excludeFromLocationId != null) q = q.Where(x => x.Stocks.All(s => s.LocationId != excludeFromLocationId));
 
-            if (emptyBarcode) q = q.Where(x => x.Barcode.IsNullOrEmpty());
+            if (emptyBarcode) q = q.Where(x => x.Barcode == null || x.Barcode.Length == 0);
 
             var keywords = keyword.Trim().Split(" ");
             foreach(var word in keywords)
@@ -200,6 +200,62 @@ namespace ProDuck.Controllers
             await _context.SaveChangesAsync();
 
             return NoContent();
+        }
+
+        [HttpPut]
+        [Authorize(Roles = "root")]
+        public async Task<IActionResult> UpdateProductMany([FromBody] List<ProductDTO> productDTOs, [FromQuery] bool onlyBarcode = false)
+        {
+            using var transaction = _context.Database.BeginTransaction();
+
+            var products = new List<Product> { };
+
+            foreach (var productDTO in productDTOs)
+            {
+                if (_context.Products == null) return Problem("Entity set 'ProDuckContext.Products'  is null.");
+                if (productDTO.Name.Length < 3) throw new ApiException("Name must be longer than 2.");
+                if (productDTO.Id == null) throw new ApiException("Id is required");
+
+                var product = await _context.Products
+                    .Include(x => x.Category)
+                    .Where(x => x.Id.Equals(productDTO.Id))
+                    .FirstOrDefaultAsync() ?? throw new ApiException("Product not found.", 404);
+
+                if (onlyBarcode)
+                {
+                    product.Barcode = productDTO.Barcode;
+                    products.Add(product);
+                    continue;
+                }
+
+                if (productDTO.CategoryId != null)
+                {
+                    var category = await _context.ProductCategories.FindAsync(productDTO.CategoryId) ?? throw new ApiException("Category not found.", 400);
+                    product.Category = category;
+                }
+                if (productDTO.CategoryId == null) product.Category = null;
+
+                product.Name = productDTO.Name;
+                product.Price = productDTO.Price;
+                product.Cost = productDTO.Cost;
+                product.Barcode = productDTO.Barcode;
+
+                products.Add(product);
+            }
+
+            try
+            {
+                _context.Products.UpdateRange(products);
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                if (ex.InnerException != null) throw new ApiException(ex.InnerException.Message);
+                throw new ApiException(ex.Message);
+            }
         }
 
         [HttpPost]
