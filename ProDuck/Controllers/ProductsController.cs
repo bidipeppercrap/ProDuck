@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using ProDuck.DTO;
 using ProDuck.Models;
 using ProDuck.QueryParams;
@@ -39,7 +40,13 @@ namespace ProDuck.Controllers
 
         [HttpGet]
         [Authorize]
-        public async Task<PaginatedResponse> GetProducts([FromQuery] long? categoryId, [FromQuery] long? excludeFromLocationId,[FromQuery] PaginationParams qp, [FromQuery] string keyword = "")
+        public async Task<PaginatedResponse> GetProducts(
+            [FromQuery] long? categoryId,
+            [FromQuery] long? excludeFromLocationId,
+            [FromQuery] PaginationParams qp,
+            [FromQuery] bool emptyBarcode = false,
+            [FromQuery] string keyword = ""
+        )
         {
             if (_context.Products == null)
             {
@@ -60,6 +67,8 @@ namespace ProDuck.Controllers
                 .Where(x => x.Category == category);
 
             if (excludeFromLocationId != null) q = q.Where(x => x.Stocks.All(s => s.LocationId != excludeFromLocationId));
+
+            if (emptyBarcode) q = q.Where(x => x.Barcode.IsNullOrEmpty());
 
             var keywords = keyword.Trim().Split(" ");
             foreach(var word in keywords)
