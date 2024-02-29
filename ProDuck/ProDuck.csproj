@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <PackageReference Include="AutoWrapper.Core" Version="4.5.1" />
+    <PackageReference Include="CsvHelper" Version="31.0.0" />
     <PackageReference Include="Isopoh.Cryptography.Argon2" Version="2.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="7.0.11" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="7.0.5">

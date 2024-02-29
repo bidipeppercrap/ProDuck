@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using AutoWrapper.Wrappers;
@@ -13,6 +14,7 @@ using ProDuck.Models;
 using ProDuck.QueryParams;
 using ProDuck.Responses;
 using ProDuck.Types;
+using CsvHelper;
 
 namespace ProDuck.Controllers
 {
@@ -37,6 +39,62 @@ namespace ProDuck.Controllers
 
             return Ok(products);
         }
+
+        [HttpGet("csv")]
+        [Authorize]
+        public async Task<FileResult> GetCsv(
+            [FromQuery] long? categoryId,
+            [FromQuery] long? excludeFromLocationId,
+            [FromQuery] bool emptyBarcode = false,
+            [FromQuery] string keyword = "")
+        {
+            if (_context.Products == null)
+            {
+                throw new ApiException("Product not found");
+            }
+            var category = categoryId != null ? await _context.ProductCategories.FindAsync(categoryId) : null;
+            if (category == null && categoryId != null) throw new ApiException("Category not found.");
+
+            var q = _context.Products
+                .Where(x => x.Deleted == false)
+                .AsQueryable();
+
+            if (categoryId != null) q = _context.Products
+                .Where(x => x.Category == category);
+
+            if (excludeFromLocationId != null) q = q.Where(x => x.Stocks.All(s => s.LocationId != excludeFromLocationId));
+
+            if (emptyBarcode) q = q.Where(x => x.Barcode == null || x.Barcode.Length == 0);
+
+            var keywords = keyword.Trim().Split(" ");
+            foreach (var word in keywords)
+            {
+                q = q.Where(x => x.Name.Contains(word));
+            }
+
+            try
+            {
+                var productsRaw = await q
+                    .OrderBy(x => x.Name)
+                    .Select(x => x)
+                    .ToListAsync();
+
+                using var memoryStream = new MemoryStream();
+                using (var streamWriter = new StreamWriter(memoryStream))
+                using (var csvWriter = new CsvWriter(streamWriter, CultureInfo.InvariantCulture))
+                {
+                    csvWriter.WriteRecords(productsRaw);
+                }
+
+                return File(memoryStream.ToArray(), "text/csv", $"Export-{DateTime.Now.ToString("s")}.csv");
+            }
+            catch (Exception ex)
+            {
+                if (ex.InnerException != null) throw new ApiException(ex.InnerException.Message);
+                throw new ApiException(ex.Message);
+            }
+        }
+
 
         [HttpGet]
         [Authorize]
@@ -84,15 +142,15 @@ namespace ProDuck.Controllers
                     .ToPagedListAsync(qp.Page, qp.PageSize);
 
                 return new PaginatedResponse(
-                new Pagination
-                {
-                    Count = products.Count,
-                    PageSize = products.PageSize,
-                    Page = products.PageNumber,
-                    TotalPages = products.TotalPages
-                },
-                products
-            );
+                    new Pagination
+                    {
+                        Count = products.Count,
+                        PageSize = products.PageSize,
+                        Page = products.PageNumber,
+                        TotalPages = products.TotalPages
+                    },
+                    products
+                );
             }
             catch (Exception ex)
             {
