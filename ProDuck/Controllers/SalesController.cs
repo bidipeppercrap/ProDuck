@@ -44,7 +44,12 @@ namespace ProDuck.Controllers
             try
             {
                 var whereQuery = _context.Products
-                    .Include(x => x.OrderItems)
+                    .Include(x =>
+			    x.OrderItems.Where(oi =>
+				DateOnly.FromDateTime(oi.Order.CreatedAt) >= startDate &&
+			        DateOnly.FromDateTime(oi.Order.CreatedAt) <= endDate
+			    )
+			)
                         .ThenInclude(oi => oi.Order)
                     .Where(x =>
                         x.OrderItems.Any(oi => DateOnly.FromDateTime(oi.Order.CreatedAt) >= startDate) &&

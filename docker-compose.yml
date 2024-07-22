@@ -6,10 +6,10 @@ services:
   database:
     image: mariadb
     environment:
-      MYSQL_ROOT_PASSWORD: pesswerd_root
+      MYSQL_ROOT_PASSWORD: Manjiw#156
       MYSQL_DATABASE: produck
       MYSQL_USER: produck
-      MYSQL_PASSWORD: pesswerd
+      MYSQL_PASSWORD: Mantap#156
     volumes:
       - data:/var/lib/mysql
       - "./sql_scripts:/docker-entrypoint-initdb.d"
@@ -27,6 +27,6 @@ services:
       - "5000:80"
     restart: always
     environment:
-      - Database:ConnectionString=Server=database; User ID=produck; Password=pesswerd; Database=produck
-      - JwtSettings:SigningKey=ItIsYourToDecide
+      - Database:ConnectionString=Server=database; User ID=produck; Password=Mantap#156; Database=produck;
+      - JwtSettings:SigningKey=5jw})4llEaW1}%h_ohsBW$"2+9G7nmLj*nK,.mC}-xp6*.=]#!w0n|[k-"zjJ%8
       - ASPNETCORE_ENVIRONMENT=Production
