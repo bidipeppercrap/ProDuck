@@ -43,7 +43,7 @@ namespace ProDuck.Controllers
         {
             try
             {
-                var result = _context.Products
+                var result = await _context.Products
                     .Include(x =>
 			    x.OrderItems.Where(oi =>
 				DateOnly.FromDateTime(oi.Order.CreatedAt) >= startDate &&
