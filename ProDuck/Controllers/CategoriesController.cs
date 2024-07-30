@@ -95,12 +95,21 @@ namespace ProDuck.Controllers
         }
 
         [HttpGet("replenishment")]
-        public async Task<PaginatedResponse> GetReplenishment([FromQuery] PaginationParams qp)
+        public async Task<PaginatedResponse> GetReplenishment([FromQuery] PaginationParams qp, [FromQuery] string keyword = "")
         {
-            var categories = await _context.ProductCategories
+            var whereQuery = _context.ProductCategories
                 .Include(x => x.ParentCategory)
                 .Include(x => x.Products).ThenInclude(xx => xx.Stocks)
                 .Where(x => x.MinQty >= x.Products.Sum(xx => xx.Stocks.Sum(s => s.Stock)))
+                .AsQueryable();
+
+            foreach(var word in keyword.Trim().Split(" "))
+            {
+                whereQuery = whereQuery.Where(x => x.Name.Contains(word));
+            }
+                
+            var categories = await whereQuery
+                .OrderBy(x => x.Name)
                 .Select(x => CategoryToProjection(x))
                 .ToPagedListAsync(qp.Page, qp.PageSize);
 
