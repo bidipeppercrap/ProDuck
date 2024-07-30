@@ -55,8 +55,8 @@ namespace ProDuck.Controllers
                         x.OrderItems.Any(oi => DateOnly.FromDateTime(oi.Order.CreatedAt) >= startDate) &&
                         x.OrderItems.Any(oi => DateOnly.FromDateTime(oi.Order.CreatedAt) <= endDate))
                     .Where(x => x.OrderItems.Sum(oi => oi.Qty) != 0)
-                    .Select(x => SaleItemToDTO(x))
                     .OrderByDescending(x => x.OrderItems.Sum(oi => oi.Qty))
+                    .Select(x => SaleItemToDTO(x))
                     .ToPagedListAsync(qp.Page, qp.PageSize);
 
                 var totalProfit = await _context.Products
