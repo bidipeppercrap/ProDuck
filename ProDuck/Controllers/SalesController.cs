@@ -38,8 +38,59 @@ namespace ProDuck.Controllers
             return dto;
         }
 
-        [HttpGet]
+ 	[HttpGet]
         public async Task<PaginatedResponse> Get([FromQuery] PaginationParams qp, [FromQuery] DateOnly startDate, [FromQuery] DateOnly endDate)
+        {
+            try
+            {
+                var result = _context.Products
+                    .Include(x =>
+			    x.OrderItems.Where(oi =>
+				DateOnly.FromDateTime(oi.Order.CreatedAt) >= startDate &&
+			        DateOnly.FromDateTime(oi.Order.CreatedAt) <= endDate
+			    )
+			)
+                        .ThenInclude(oi => oi.Order)
+                    .Where(x =>
+                        x.OrderItems.Any(oi => DateOnly.FromDateTime(oi.Order.CreatedAt) >= startDate) &&
+                        x.OrderItems.Any(oi => DateOnly.FromDateTime(oi.Order.CreatedAt) <= endDate))
+                    .Where(x => x.OrderItems.Sum(oi => oi.Qty) != 0)
+                    .Select(x => SaleItemToDTO(x))
+                    .OrderByDescending(x => x.OrderItems.Sum(oi => oi.Qty))
+                    .ToPagedListAsync(qp.Page, qp.PageSize);
+
+                var totalProfit = await _context.Products
+                    .Include(x =>
+			    x.OrderItems.Where(oi =>
+				DateOnly.FromDateTime(oi.Order.CreatedAt) >= startDate &&
+			        DateOnly.FromDateTime(oi.Order.CreatedAt) <= endDate
+			    )
+			)
+                        .ThenInclude(oi => oi.Order)
+                    .Where(x =>
+                        x.OrderItems.Any(oi => DateOnly.FromDateTime(oi.Order.CreatedAt) >= startDate) &&
+                        x.OrderItems.Any(oi => DateOnly.FromDateTime(oi.Order.CreatedAt) <= endDate))
+                    .Where(x => x.OrderItems.Sum(oi => oi.Qty) != 0)
+                    .SumAsync(x => x.OrderItems.Sum(oi => (oi.Price - oi.Cost) * oi.Qty));
+
+                var payload = new Payload(result, totalProfit);
+
+                return new PaginatedResponse(payload, new Pagination
+                {
+                    Count = result.Count,
+                    Page = qp.Page,
+                    PageSize = qp.PageSize,
+                    TotalPages = result.TotalPages
+                });
+            }
+            catch (Exception ex)
+            {
+                if (ex.InnerException != null) throw new ApiException(ex.InnerException.Message);
+                throw new ApiException(ex.Message);
+            }
+        }
+
+        public async Task<PaginatedResponse> OldGet([FromQuery] PaginationParams qp, [FromQuery] DateOnly startDate, [FromQuery] DateOnly endDate)
         {
             try
             {
