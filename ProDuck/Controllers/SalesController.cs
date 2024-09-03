@@ -38,14 +38,14 @@ namespace ProDuck.Controllers
             return dto;
         }
 
-	[HttpGet]
-	public async Task<PaginatedResponse> GetBySession([FromQuery] PaginationParams qp, [FromQuery] long sessionId, [FromQuery] string keyword = "")
+	[HttpGet("session/{id}")]
+	public async Task<PaginatedResponse> GetBySession(long id, [FromQuery] PaginationParams qp, [FromQuery] string keyword = "")
 	{
 		var q = _context.Products
 			.Include(x =>
-				x.OrderItems.Where(oi => oi.Order.POSSessionId == sessionId)
+				x.OrderItems.Where(oi => oi.Order.POSSessionId == id)
 			).ThenInclude(oi => oi.Order)
-			.Where(x => x.OrderItems.Any(oi => oi.Order.POSSessionId == sessionId))
+			.Where(x => x.OrderItems.Any(oi => oi.Order.POSSessionId == id))
 			.AsQueryable();
 
 		var keywords = keyword.Trim().Split(" ");
