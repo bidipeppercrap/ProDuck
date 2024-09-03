@@ -38,6 +38,48 @@ namespace ProDuck.Controllers
             return dto;
         }
 
+	[HttpGet]
+	public async Task<PaginatedResponse> GetBySession([FromQuery] PaginationParams qp, [FromQuery] long sessionId, [FromQuery] string keyword = "")
+	{
+		var q = _context.Products
+			.Include(x =>
+				x.OrderItems.Where(oi => oi.Order.POSSessionId == sessionId)
+			).ThenInclude(oi => oi.Order)
+			.Where(x => x.OrderItems.Any(oi => oi.Order.POSSessionId == sessionId))
+			.AsQueryable();
+
+		var keywords = keyword.Trim().Split(" ");
+		foreach (var word in keywords)
+		{
+			q = q.Where(x => x.Name.Contains(word));
+		}
+
+		try
+		{
+			var result = await q
+				.Where(x => x.OrderItems.Sum(oi => oi.Qty) != 0)
+				.OrderByDescending(x => x.OrderItems.Sum(oi => oi.Price))
+				.Select(x => SaleItemToDTO(x))
+				.ToPagedListAsync(qp.Page, qp.PageSize);
+
+			return new PaginatedResponse(
+				result,
+				new Pagination
+				{
+					Count = result.Count,
+					PageSize = qp.PageSize,
+					Page = qp.Page,
+					TotalPages = result.TotalPages
+				}
+			);
+		}
+		catch (Exception ex)
+		{
+			if (ex.InnerException != null) throw new ApiException(ex.InnerException.Message);
+			throw new ApiException(ex.Message);
+		}
+	}
+
  	[HttpGet]
         public async Task<PaginatedResponse> Get([FromQuery] PaginationParams qp, [FromQuery] DateOnly startDate, [FromQuery] DateOnly endDate)
         {
